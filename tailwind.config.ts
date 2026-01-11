@@ -52,12 +52,23 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        gold: "hsl(var(--gold))",
-        "gold-muted": "hsl(var(--gold-muted))",
-        cream: "hsl(var(--cream))",
-        "cream-muted": "hsl(var(--cream-muted))",
-        "teal-deep": "hsl(var(--teal-deep))",
-        "teal-darker": "hsl(var(--teal-darker))",
+        gold: {
+          DEFAULT: "hsl(var(--gold))",
+          bright: "hsl(var(--gold-bright))",
+          muted: "hsl(var(--gold-muted))",
+        },
+        cream: {
+          DEFAULT: "hsl(var(--cream))",
+          warm: "hsl(var(--cream-warm))",
+          muted: "hsl(var(--cream-muted))",
+        },
+        teal: {
+          deep: "hsl(var(--teal-deep))",
+          darker: "hsl(var(--teal-darker))",
+          light: "hsl(var(--teal-light))",
+        },
+        charcoal: "hsl(var(--charcoal))",
+        "soft-gray": "hsl(var(--soft-gray))",
       },
       fontFamily: {
         serif: ["Cormorant Garamond", "Georgia", "serif"],
@@ -78,18 +89,16 @@ export default {
           to: { height: "0" },
         },
         "fade-in-up": {
-          from: {
-            opacity: "0",
-            transform: "translateY(30px)",
-          },
-          to: {
-            opacity: "1",
-            transform: "translateY(0)",
-          },
+          from: { opacity: "0", transform: "translateY(30px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
         },
         "fade-in": {
           from: { opacity: "0" },
           to: { opacity: "1" },
+        },
+        "scale-in": {
+          from: { opacity: "0", transform: "scale(0.95)" },
+          to: { opacity: "1", transform: "scale(1)" },
         },
       },
       animation: {
@@ -97,13 +106,7 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
         "fade-in-up": "fade-in-up 0.8s ease-out forwards",
         "fade-in": "fade-in 1s ease-out forwards",
-      },
-      spacing: {
-        "18": "4.5rem",
-        "22": "5.5rem",
-      },
-      letterSpacing: {
-        "widest-xl": "0.2em",
+        "scale-in": "scale-in 0.5s ease-out forwards",
       },
     },
   },

@@ -1,12 +1,16 @@
+import Navigation from "@/components/Navigation";
 import Hero from "@/components/Hero";
-import Writings from "@/components/Writings";
+import FeaturedQuote from "@/components/FeaturedQuote";
+import FeaturedContent from "@/components/FeaturedContent";
 import Footer from "@/components/Footer";
 
 const Index = () => {
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen">
+      <Navigation />
       <Hero />
-      <Writings />
+      <FeaturedQuote />
+      <FeaturedContent />
       <Footer />
     </main>
   );
