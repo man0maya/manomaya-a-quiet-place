@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Instagram } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
-import manomayaLogo from "@/assets/manomaya-logo.jpg";
+import manomayaLogo from "@/assets/manomaya-logo.png";
 
 const About = () => {
   return (
@@ -26,7 +26,7 @@ const About = () => {
             <img
               src={manomayaLogo}
               alt="Manomaya"
-              className="w-24 h-24 mx-auto rounded-lg glow-soft mb-8"
+              className="w-24 h-24 mx-auto glow-soft mb-8 object-contain"
             />
             <h1 className="text-4xl md:text-6xl font-serif text-foreground mb-6">
               About Manomaya
