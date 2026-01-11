@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import manomayaLogo from "@/assets/manomaya-logo.jpg";
+import manomayaLogo from "@/assets/manomaya-logo.png";
 
 const Hero = () => {
   return (
@@ -33,7 +33,7 @@ const Hero = () => {
           <img 
             src={manomayaLogo} 
             alt="Manomaya" 
-            className="relative w-36 h-36 md:w-48 md:h-48 mx-auto object-cover rounded-xl glow-soft float"
+            className="relative w-36 h-36 md:w-48 md:h-48 mx-auto object-contain glow-soft float"
           />
         </motion.div>
 

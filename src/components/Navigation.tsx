@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
-import manomayaLogo from "@/assets/manomaya-logo.jpg";
+import manomayaLogo from "@/assets/manomaya-logo.png";
 
 const navItems = [
   { name: "Home", path: "/" },
@@ -25,7 +25,7 @@ const Navigation = () => {
             <img 
               src={manomayaLogo} 
               alt="Manomaya" 
-              className="w-10 h-10 rounded object-cover transition-transform duration-500 group-hover:scale-105"
+              className="w-10 h-10 object-contain transition-transform duration-500 group-hover:scale-105"
             />
             <span className="text-lg font-serif text-primary hidden sm:block">
               manomaya
