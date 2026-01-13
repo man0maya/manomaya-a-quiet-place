@@ -22,19 +22,21 @@ const Hero = () => {
         transition={{ duration: 1.5 }}
         className="relative z-10 text-center max-w-3xl mx-auto"
       >
-        {/* Logo with glow */}
+        {/* Logo - clean circular presentation */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, delay: 0.2 }}
           className="relative mb-10"
         >
-          <div className="absolute inset-0 blur-3xl opacity-40 bg-primary rounded-full scale-150" />
-          <img 
-            src={manomayaLogo} 
-            alt="Manomaya" 
-            className="relative w-36 h-36 md:w-48 md:h-48 mx-auto object-contain glow-soft float"
-          />
+          <div className="absolute inset-0 blur-2xl opacity-30 bg-primary rounded-full scale-125" />
+          <div className="relative w-36 h-36 md:w-48 md:h-48 mx-auto rounded-full overflow-hidden bg-background/80 backdrop-blur-sm border border-primary/20 shadow-lg">
+            <img 
+              src={manomayaLogo} 
+              alt="Manomaya" 
+              className="w-full h-full object-cover float"
+            />
+          </div>
         </motion.div>
 
         {/* Title */}
