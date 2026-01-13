@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, RefreshCw, Sparkles, BookOpen } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
+import SEOHead from "@/components/SEOHead";
 import { useAIContent, GeneratedStory } from "@/hooks/useAIContent";
 import { Button } from "@/components/ui/button";
 
@@ -45,8 +46,15 @@ const Stories = () => {
   };
 
   return (
-    <main className="min-h-screen">
-      <Navigation />
+    <>
+      <SEOHead 
+        title="Spiritual Stories & Contemplative Reflections"
+        description="Read contemplative stories and spiritual reflections on mindfulness, inner peace, and awakening. Poetic writings for deeper self-discovery and meditation practice."
+        keywords="spiritual stories, contemplative writing, mindfulness reflections, meditation stories, spiritual awakening, inner peace, self-discovery, poetic reflections, zen stories, wisdom tales"
+        canonicalUrl="https://manomaya.lovable.app/stories"
+      />
+      <main className="min-h-screen">
+        <Navigation />
 
       {/* Header - Teal section */}
       <section className="section-teal pt-32 pb-16 px-6">
@@ -234,6 +242,7 @@ const Stories = () => {
 
       <Footer />
     </main>
+    </>
   );
 };
 

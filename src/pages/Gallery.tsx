@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
+import SEOHead from "@/components/SEOHead";
 
 import gallery1 from "@/assets/gallery-1.jpg";
 import gallery2 from "@/assets/gallery-2.jpg";
@@ -20,8 +21,15 @@ const Gallery = () => {
   const [selected, setSelected] = useState<number | null>(null);
 
   return (
-    <main className="min-h-screen section-teal">
-      <Navigation />
+    <>
+      <SEOHead 
+        title="Spiritual Gallery — Meditation & Mindfulness Images"
+        description="Browse our curated gallery of spiritual and meditative images. Peaceful visuals for contemplation, mindfulness practice, and inner reflection."
+        keywords="spiritual images, meditation gallery, mindfulness pictures, peaceful photos, contemplative art, spiritual photography, zen images, nature meditation, lotus, serenity"
+        canonicalUrl="https://manomaya.lovable.app/gallery"
+      />
+      <main className="min-h-screen section-teal">
+        <Navigation />
       
       {/* Header */}
       <section className="pt-32 pb-16 px-6">
@@ -121,6 +129,7 @@ const Gallery = () => {
 
       <Footer />
     </main>
+    </>
   );
 };
 
