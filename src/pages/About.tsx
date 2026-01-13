@@ -2,12 +2,20 @@ import { motion } from "framer-motion";
 import { Instagram } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
+import SEOHead from "@/components/SEOHead";
 import manomayaLogo from "@/assets/manomaya-logo.png";
 
 const About = () => {
   return (
-    <main className="min-h-screen">
-      <Navigation />
+    <>
+      <SEOHead 
+        title="About Manomaya — Spiritual Wisdom & Mindfulness"
+        description="Learn about Manomaya, a sacred digital sanctuary for spiritual quotes, mindfulness practices, and contemplative wisdom. No ads, no trackers — just stillness and inner peace."
+        keywords="about Manomaya, spiritual sanctuary, mindfulness website, meditation space, contemplative wisdom, digital wellness, spiritual philosophy, Manomaya Kosha, yogic philosophy"
+        canonicalUrl="https://manomaya.lovable.app/about"
+      />
+      <main className="min-h-screen">
+        <Navigation />
 
       {/* Hero - Teal section */}
       <section className="section-teal pt-32 pb-20 px-6 relative overflow-hidden">
@@ -121,6 +129,7 @@ const About = () => {
 
       <Footer />
     </main>
+    </>
   );
 };
 

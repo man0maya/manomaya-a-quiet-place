@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { RefreshCw, Sparkles } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
+import SEOHead from "@/components/SEOHead";
 import { useAIContent, GeneratedQuote } from "@/hooks/useAIContent";
 import { Button } from "@/components/ui/button";
 
@@ -65,8 +66,15 @@ const Quotes = () => {
   };
 
   return (
-    <main className="min-h-screen section-teal">
-      <Navigation />
+    <>
+      <SEOHead 
+        title="Spiritual Quotes for Mindfulness & Inner Peace"
+        description="Explore curated spiritual quotes from Buddhist, Hindu, Sufi, Zen, and Taoist traditions. Daily wisdom for meditation, mindfulness, and spiritual awakening."
+        keywords="spiritual quotes, mindfulness quotes, meditation quotes, zen quotes, Rumi quotes, Lao Tzu, Ram Dass, inner peace quotes, wisdom quotes, consciousness, spiritual awakening, Buddhist wisdom, Hindu philosophy"
+        canonicalUrl="https://manomaya.lovable.app/quotes"
+      />
+      <main className="min-h-screen section-teal">
+        <Navigation />
 
       {/* Header */}
       <section className="pt-32 pb-16 px-6">
@@ -217,6 +225,7 @@ const Quotes = () => {
 
       <Footer />
     </main>
+    </>
   );
 };
 
