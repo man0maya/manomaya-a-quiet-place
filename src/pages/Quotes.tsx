@@ -4,6 +4,8 @@ import { RefreshCw, Sparkles, Clock } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import SEOHead from "@/components/SEOHead";
+import LikeButton from "@/components/LikeButton";
+import ShareButton from "@/components/ShareButton";
 import { useAIContent, GeneratedQuote } from "@/hooks/useAIContent";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
@@ -183,9 +185,19 @@ const Quotes = () => {
                         <div className="divider-gold-solid w-8" />
                       </div>
                       {quote.created_at && (
-                        <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground/50">
+                        <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground/50 mb-4">
                           <Clock size={12} />
                           <span>{formatDate(quote.created_at)}</span>
+                        </div>
+                      )}
+                      {quote.id && (
+                        <div className="flex items-center justify-center gap-4">
+                          <LikeButton itemId={quote.id} itemType="quote" />
+                          <ShareButton
+                            title={`Quote by ${quote.author}`}
+                            text={quote.text}
+                            url={`https://manomaya.lovable.app/quotes#${quote.id}`}
+                          />
                         </div>
                       )}
                       {index < savedQuotes.length - 1 && (
