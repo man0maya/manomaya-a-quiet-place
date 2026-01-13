@@ -14,7 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      generated_quotes: {
+        Row: {
+          author: string
+          created_at: string
+          id: string
+          text: string
+        }
+        Insert: {
+          author: string
+          created_at?: string
+          id?: string
+          text: string
+        }
+        Update: {
+          author?: string
+          created_at?: string
+          id?: string
+          text?: string
+        }
+        Relationships: []
+      }
+      generated_stories: {
+        Row: {
+          content: string
+          created_at: string
+          excerpt: string
+          id: string
+          read_time: string
+          title: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          excerpt: string
+          id?: string
+          read_time?: string
+          title: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          excerpt?: string
+          id?: string
+          read_time?: string
+          title?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
