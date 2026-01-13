@@ -3,16 +3,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export interface GeneratedQuote {
+  id?: string;
   text: string;
   author: string;
+  created_at?: string;
 }
 
 export interface GeneratedStory {
+  id?: string;
   title: string;
   excerpt: string;
   content: string;
-  date: string;
-  readTime: string;
+  read_time?: string;
+  readTime?: string;
+  created_at?: string;
 }
 
 export function useAIContent() {
@@ -65,9 +69,41 @@ export function useAIContent() {
     }
   }, []);
 
+  const fetchSavedQuotes = useCallback(async (): Promise<GeneratedQuote[]> => {
+    const { data, error } = await supabase
+      .from('generated_quotes')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error('Error fetching quotes:', error);
+      return [];
+    }
+
+    return data || [];
+  }, []);
+
+  const fetchSavedStories = useCallback(async (): Promise<GeneratedStory[]> => {
+    const { data, error } = await supabase
+      .from('generated_stories')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) {
+      console.error('Error fetching stories:', error);
+      return [];
+    }
+
+    return data || [];
+  }, []);
+
   return {
     generateQuote,
     generateStory,
+    fetchSavedQuotes,
+    fetchSavedStories,
     isGeneratingQuote,
     isGeneratingStory,
   };

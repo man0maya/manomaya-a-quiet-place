@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw, Sparkles } from "lucide-react";
+import { RefreshCw, Sparkles, Clock } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import SEOHead from "@/components/SEOHead";
 import { useAIContent, GeneratedQuote } from "@/hooks/useAIContent";
 import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
 
 const staticQuotes = [
   {
@@ -43,26 +44,32 @@ const staticQuotes = [
 ];
 
 const Quotes = () => {
-  const [quotes, setQuotes] = useState<GeneratedQuote[]>(staticQuotes);
-  const [featuredQuote, setFeaturedQuote] = useState<GeneratedQuote | null>(null);
-  const { generateQuote, isGeneratingQuote } = useAIContent();
+  const [savedQuotes, setSavedQuotes] = useState<GeneratedQuote[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { generateQuote, fetchSavedQuotes, isGeneratingQuote } = useAIContent();
 
-  // Generate a featured quote on mount
+  // Fetch saved quotes on mount
   useEffect(() => {
-    const loadFeaturedQuote = async () => {
-      const quote = await generateQuote();
-      if (quote) {
-        setFeaturedQuote(quote);
-      }
+    const loadQuotes = async () => {
+      setIsLoading(true);
+      const quotes = await fetchSavedQuotes();
+      setSavedQuotes(quotes);
+      setIsLoading(false);
     };
-    loadFeaturedQuote();
-  }, []);
+    loadQuotes();
+  }, [fetchSavedQuotes]);
 
   const handleGenerateNew = async () => {
     const quote = await generateQuote();
     if (quote) {
-      setFeaturedQuote(quote);
+      // Add to the beginning of saved quotes
+      setSavedQuotes(prev => [quote, ...prev]);
     }
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "";
+    return format(new Date(dateString), "MMM d, yyyy 'at' h:mm a");
   };
 
   return (
@@ -76,155 +83,172 @@ const Quotes = () => {
       <main className="min-h-screen section-teal">
         <Navigation />
 
-      {/* Header */}
-      <section className="pt-32 pb-16 px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <motion.span
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8 }}
-            className="text-4xl mb-6 block"
-          >
-            🪷
-          </motion.span>
-          <motion.h1
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.1 }}
-            className="text-4xl md:text-6xl font-serif text-foreground mb-6"
-          >
-            Quotes
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-            className="text-muted-foreground text-lg"
-          >
-            One thought at a time. One pause at a time.
-          </motion.p>
-          <motion.div
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ duration: 1, delay: 0.5 }}
-            className="divider-gold w-24 mx-auto mt-8"
-          />
-        </div>
-      </section>
+        {/* Header */}
+        <section className="pt-32 pb-16 px-6">
+          <div className="max-w-4xl mx-auto text-center">
+            <motion.span
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8 }}
+              className="text-4xl mb-6 block"
+            >
+              🪷
+            </motion.span>
+            <motion.h1
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.1 }}
+              className="text-4xl md:text-6xl font-serif text-foreground mb-6"
+            >
+              Quotes
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.3 }}
+              className="text-muted-foreground text-lg"
+            >
+              One thought at a time. One pause at a time.
+            </motion.p>
+            <motion.div
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ duration: 1, delay: 0.5 }}
+              className="divider-gold w-24 mx-auto mt-8"
+            />
+          </div>
+        </section>
 
-      {/* AI Generated Featured Quote */}
-      <section className="px-6 pb-12">
-        <div className="max-w-3xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="relative bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-lg p-8 md:p-12"
-          >
-            <div className="absolute top-4 right-4 flex items-center gap-2 text-xs text-primary/60">
-              <Sparkles size={14} />
-              <span>AI Generated</span>
-            </div>
-
-            <AnimatePresence mode="wait">
-              {isGeneratingQuote ? (
-                <motion.div
-                  key="loading"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="text-center py-8"
-                >
-                  <RefreshCw className="w-8 h-8 mx-auto text-primary animate-spin mb-4" />
-                  <p className="text-muted-foreground">Generating wisdom...</p>
-                </motion.div>
-              ) : featuredQuote ? (
-                <motion.div
-                  key={featuredQuote.text}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.5 }}
-                  className="text-center"
-                >
-                  <blockquote className="font-serif text-2xl md:text-3xl text-primary leading-relaxed italic mb-6">
-                    "{featuredQuote.text}"
-                  </blockquote>
-                  <div className="flex items-center justify-center gap-3 mb-8">
-                    <div className="divider-gold-solid w-8" />
-                    <cite className="text-muted-foreground not-italic text-sm tracking-wide">
-                      {featuredQuote.author}
-                    </cite>
-                    <div className="divider-gold-solid w-8" />
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="empty"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-center py-8"
-                >
-                  <p className="text-muted-foreground">Click below to generate a quote</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <div className="text-center">
+        {/* Generate New Quote Section */}
+        <section className="px-6 pb-12">
+          <div className="max-w-3xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="text-center bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-lg p-8"
+            >
+              <Sparkles className="w-8 h-8 mx-auto text-primary mb-4" />
+              <h2 className="text-xl font-serif text-foreground mb-4">Generate AI Wisdom</h2>
+              <p className="text-muted-foreground mb-6">
+                Create a new spiritual quote powered by AI. It will be saved for everyone to see.
+              </p>
               <Button
                 onClick={handleGenerateNew}
                 disabled={isGeneratingQuote}
-                variant="outline"
-                className="border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 <RefreshCw className={`w-4 h-4 mr-2 ${isGeneratingQuote ? 'animate-spin' : ''}`} />
-                Generate New Quote
+                {isGeneratingQuote ? 'Generating...' : 'Generate New Quote'}
               </Button>
-            </div>
-          </motion.div>
-        </div>
-      </section>
+            </motion.div>
+          </div>
+        </section>
 
-      {/* Static Quotes List */}
-      <section className="px-6 pb-24">
-        <div className="max-w-3xl mx-auto space-y-12">
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className="text-center text-sm text-muted-foreground/60 uppercase tracking-widest mb-8"
-          >
-            Curated Collection
-          </motion.p>
-          {quotes.map((quote, index) => (
-            <motion.article
-              key={index}
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
-              transition={{ duration: 0.7, delay: index * 0.05 }}
-              className="text-center"
-            >
-              <blockquote className="font-serif text-2xl md:text-3xl text-primary leading-relaxed italic mb-6">
-                "{quote.text}"
-              </blockquote>
-              <div className="flex items-center justify-center gap-3">
-                <div className="divider-gold-solid w-8" />
-                <cite className="text-muted-foreground not-italic text-sm tracking-wide">
-                  {quote.author}
-                </cite>
-                <div className="divider-gold-solid w-8" />
+        {/* AI Generated Quotes */}
+        {savedQuotes.length > 0 && (
+          <section className="px-6 pb-16">
+            <div className="max-w-3xl mx-auto">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex items-center justify-center gap-2 mb-8"
+              >
+                <Sparkles size={16} className="text-primary/60" />
+                <p className="text-sm text-primary/60 uppercase tracking-widest">
+                  AI Generated Collection
+                </p>
+                <Sparkles size={16} className="text-primary/60" />
+              </motion.div>
+              
+              <div className="space-y-12">
+                <AnimatePresence>
+                  {savedQuotes.map((quote, index) => (
+                    <motion.article
+                      key={quote.id || index}
+                      initial={{ opacity: 0, y: 40 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ duration: 0.5, delay: index * 0.05 }}
+                      className="text-center"
+                    >
+                      <blockquote className="font-serif text-2xl md:text-3xl text-primary leading-relaxed italic mb-6">
+                        "{quote.text}"
+                      </blockquote>
+                      <div className="flex items-center justify-center gap-3 mb-3">
+                        <div className="divider-gold-solid w-8" />
+                        <cite className="text-muted-foreground not-italic text-sm tracking-wide">
+                          {quote.author}
+                        </cite>
+                        <div className="divider-gold-solid w-8" />
+                      </div>
+                      {quote.created_at && (
+                        <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground/50">
+                          <Clock size={12} />
+                          <span>{formatDate(quote.created_at)}</span>
+                        </div>
+                      )}
+                      {index < savedQuotes.length - 1 && (
+                        <div className="mt-12 lotus-decoration" />
+                      )}
+                    </motion.article>
+                  ))}
+                </AnimatePresence>
               </div>
-              {index < quotes.length - 1 && (
-                <div className="mt-12 lotus-decoration" />
-              )}
-            </motion.article>
-          ))}
-        </div>
-      </section>
+            </div>
+          </section>
+        )}
 
-      <Footer />
-    </main>
+        {/* Loading State */}
+        {isLoading && (
+          <section className="px-6 pb-16">
+            <div className="max-w-3xl mx-auto text-center">
+              <RefreshCw className="w-6 h-6 mx-auto text-primary animate-spin" />
+              <p className="text-muted-foreground mt-4">Loading quotes...</p>
+            </div>
+          </section>
+        )}
+
+        {/* Static Quotes List */}
+        <section className="px-6 pb-24">
+          <div className="max-w-3xl mx-auto space-y-12">
+            <motion.p
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              className="text-center text-sm text-muted-foreground/60 uppercase tracking-widest mb-8"
+            >
+              Curated Collection
+            </motion.p>
+            {staticQuotes.map((quote, index) => (
+              <motion.article
+                key={index}
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{ duration: 0.7, delay: index * 0.05 }}
+                className="text-center"
+              >
+                <blockquote className="font-serif text-2xl md:text-3xl text-primary leading-relaxed italic mb-6">
+                  "{quote.text}"
+                </blockquote>
+                <div className="flex items-center justify-center gap-3">
+                  <div className="divider-gold-solid w-8" />
+                  <cite className="text-muted-foreground not-italic text-sm tracking-wide">
+                    {quote.author}
+                  </cite>
+                  <div className="divider-gold-solid w-8" />
+                </div>
+                {index < staticQuotes.length - 1 && (
+                  <div className="mt-12 lotus-decoration" />
+                )}
+              </motion.article>
+            ))}
+          </div>
+        </section>
+
+        <Footer />
+      </main>
     </>
   );
 };

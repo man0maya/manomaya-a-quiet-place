@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,10 +14,19 @@ serve(async (req) => {
   try {
     const { type } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
+
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error("Supabase configuration is missing");
+    }
+
+    // Create Supabase client with service role for inserting
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     let systemPrompt = "";
     let userPrompt = "";
@@ -40,13 +50,14 @@ Your response must be valid JSON with this exact structure:
   "title": "A Poetic Title",
   "excerpt": "A 2-3 sentence preview of the story",
   "content": "The full story/reflection in 3-5 paragraphs. Use poetic, contemplative language.",
-  "date": "Current month and year like 'January 2026'",
   "readTime": "X min read"
 }`;
       userPrompt = "Generate a new contemplative story or reflection about stillness, nature, or spiritual awakening.";
     } else {
       throw new Error("Invalid type. Use 'quote' or 'story'.");
     }
+
+    console.log(`Generating ${type} content...`);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -91,6 +102,46 @@ Your response must be valid JSON with this exact structure:
     }
     
     const content = JSON.parse(jsonMatch[0]);
+    console.log(`Generated ${type}:`, content);
+
+    // Save to database
+    if (type === "quote") {
+      const { data: savedQuote, error: saveError } = await supabase
+        .from("generated_quotes")
+        .insert({
+          text: content.text,
+          author: content.author,
+        })
+        .select()
+        .single();
+
+      if (saveError) {
+        console.error("Error saving quote:", saveError);
+      } else {
+        console.log("Quote saved successfully:", savedQuote.id);
+        content.id = savedQuote.id;
+        content.created_at = savedQuote.created_at;
+      }
+    } else if (type === "story") {
+      const { data: savedStory, error: saveError } = await supabase
+        .from("generated_stories")
+        .insert({
+          title: content.title,
+          excerpt: content.excerpt,
+          content: content.content,
+          read_time: content.readTime || "5 min read",
+        })
+        .select()
+        .single();
+
+      if (saveError) {
+        console.error("Error saving story:", saveError);
+      } else {
+        console.log("Story saved successfully:", savedStory.id);
+        content.id = savedStory.id;
+        content.created_at = savedStory.created_at;
+      }
+    }
 
     return new Response(JSON.stringify({ content, type }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
