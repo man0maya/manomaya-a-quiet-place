@@ -5,6 +5,8 @@ import { ArrowRight, RefreshCw, Sparkles, BookOpen, Clock } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import SEOHead from "@/components/SEOHead";
+import LikeButton from "@/components/LikeButton";
+import ShareButton from "@/components/ShareButton";
 import { useAIContent, GeneratedStory } from "@/hooks/useAIContent";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
@@ -203,14 +205,32 @@ const Stories = () => {
                         )}
                       </AnimatePresence>
 
-                      <Button
-                        onClick={() => setExpandedStory(expandedStory === story.id ? null : story.id || null)}
-                        variant="outline"
-                        className="border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
-                      >
-                        <BookOpen className="w-4 h-4 mr-2" />
-                        {expandedStory === story.id ? 'Hide Story' : 'Read Full Story'}
-                      </Button>
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <Button
+                          onClick={() => setExpandedStory(expandedStory === story.id ? null : story.id || null)}
+                          variant="outline"
+                          className="border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
+                        >
+                          <BookOpen className="w-4 h-4 mr-2" />
+                          {expandedStory === story.id ? 'Hide Story' : 'Read Full Story'}
+                        </Button>
+                        {story.id && (
+                          <>
+                            <LikeButton itemId={story.id} itemType="story" />
+                            <ShareButton
+                              title={story.title}
+                              text={story.excerpt}
+                              url={`https://manomaya.lovable.app/stories/${story.id}`}
+                            />
+                            <Link
+                              to={`/stories/${story.id}`}
+                              className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                            >
+                              Open Full Page →
+                            </Link>
+                          </>
+                        )}
+                      </div>
                     </motion.article>
                   ))}
                 </AnimatePresence>

@@ -62,6 +62,64 @@ export type Database = {
         }
         Relationships: []
       }
+      quote_likes: {
+        Row: {
+          created_at: string
+          id: string
+          quote_id: string
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          quote_id: string
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          quote_id?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_likes_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "generated_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      story_likes: {
+        Row: {
+          created_at: string
+          id: string
+          session_id: string
+          story_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          session_id: string
+          story_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          session_id?: string
+          story_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "story_likes_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "generated_stories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
