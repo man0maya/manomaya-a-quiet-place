@@ -1,28 +1,134 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 5; // 5 requests per minute per IP
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+// Allowed origins for CORS
+const ALLOWED_ORIGINS = [
+  'https://manomaya.lovable.app',
+  'https://id-preview--47e85661-7ea3-4c77-a792-6f9cd27fff13.lovable.app'
+];
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.some(allowed => 
+    origin === allowed || origin.endsWith('.lovable.app')
+  ) ? origin : ALLOWED_ORIGINS[0];
+  
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+}
+
+function checkRateLimit(clientIP: string): { allowed: boolean; retryAfter?: number } {
+  const now = Date.now();
+  const record = rateLimitStore.get(clientIP);
+  
+  // Clean up old entries periodically
+  if (rateLimitStore.size > 1000) {
+    for (const [ip, data] of rateLimitStore.entries()) {
+      if (data.resetTime < now) {
+        rateLimitStore.delete(ip);
+      }
+    }
+  }
+  
+  if (!record || record.resetTime < now) {
+    // New window
+    rateLimitStore.set(clientIP, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true };
+  }
+  
+  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
+    const retryAfter = Math.ceil((record.resetTime - now) / 1000);
+    return { allowed: false, retryAfter };
+  }
+  
+  record.count++;
+  return { allowed: true };
+}
 
 serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Only allow POST requests
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
-    const { type } = await req.json();
+    // Get client IP for rate limiting
+    const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                     req.headers.get('x-real-ip') || 
+                     'unknown';
+    
+    // Check rate limit
+    const rateLimitResult = checkRateLimit(clientIP);
+    if (!rateLimitResult.allowed) {
+      console.log(`Rate limit exceeded for IP: ${clientIP}`);
+      return new Response(JSON.stringify({ 
+        error: "Too many requests. Please wait before generating more content.",
+        retryAfter: rateLimitResult.retryAfter 
+      }), {
+        status: 429,
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json",
+          "Retry-After": String(rateLimitResult.retryAfter)
+        },
+      });
+    }
+
+    // Validate request body size (max 1KB for this simple endpoint)
+    const contentLength = req.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > 1024) {
+      return new Response(JSON.stringify({ error: "Request too large" }), {
+        status: 413,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const body = await req.json();
+    const { type } = body;
+    
+    // Strict type validation
+    if (!type || (type !== "quote" && type !== "story")) {
+      return new Response(JSON.stringify({ error: "Invalid type. Use 'quote' or 'story'." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
     if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+      console.error("LOVABLE_API_KEY is not configured");
+      return new Response(JSON.stringify({ error: "Service configuration error" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error("Supabase configuration is missing");
+      console.error("Supabase configuration is missing");
+      return new Response(JSON.stringify({ error: "Service configuration error" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Create Supabase client with service role for inserting
@@ -53,11 +159,9 @@ Your response must be valid JSON with this exact structure:
   "readTime": "X min read"
 }`;
       userPrompt = "Generate a new contemplative story or reflection about stillness, nature, or spiritual awakening.";
-    } else {
-      throw new Error("Invalid type. Use 'quote' or 'story'.");
     }
 
-    console.log(`Generating ${type} content...`);
+    console.log(`Generating ${type} content for IP: ${clientIP}`);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -87,9 +191,11 @@ Your response must be valid JSON with this exact structure:
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error("Failed to generate content");
+      console.error("AI gateway error:", response.status);
+      return new Response(JSON.stringify({ error: "Failed to generate content" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const data = await response.json();
@@ -98,11 +204,15 @@ Your response must be valid JSON with this exact structure:
     // Parse the JSON response
     const jsonMatch = generatedText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      throw new Error("Failed to parse generated content");
+      console.error("Failed to parse AI response");
+      return new Response(JSON.stringify({ error: "Failed to generate content" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
     
     const content = JSON.parse(jsonMatch[0]);
-    console.log(`Generated ${type}:`, content);
+    console.log(`Generated ${type} successfully`);
 
     // Save to database
     if (type === "quote") {
@@ -148,8 +258,7 @@ Your response must be valid JSON with this exact structure:
     });
   } catch (error) {
     console.error("Error in generate-content function:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    return new Response(JSON.stringify({ error: "An error occurred" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
