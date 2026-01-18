@@ -5,9 +5,10 @@
 @tailwind utilities;
 
 @layer base {
+  #lovable-badge { display: none !important; }
+  
   :root {
     /* Manomaya Design System */
-    #lovable-badge { display: none !important; }
     --background: 170 52% 24%;
     --foreground: 40 30% 94%;
 
