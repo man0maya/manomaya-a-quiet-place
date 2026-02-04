@@ -4,22 +4,22 @@ import { ArrowRight } from "lucide-react";
 
 const sections = [
   {
+    title: "Reflections",
+    description: "AI-powered wisdom and mindful notes",
+    link: "/feed",
+    icon: "🌿",
+  },
+  {
     title: "Gallery",
     description: "Visual meditations for quiet reflection",
     link: "/gallery",
     icon: "🖼",
   },
   {
-    title: "Quotes",
-    description: "Timeless wisdom, one thought at a time",
-    link: "/quotes",
+    title: "About",
+    description: "The philosophy behind manomaya",
+    link: "/about",
     icon: "🪷",
-  },
-  {
-    title: "Stories",
-    description: "Longer reflections for deeper reading",
-    link: "/stories",
-    icon: "📖",
   },
 ];
 

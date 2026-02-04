@@ -14,6 +14,81 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_reflections: {
+        Row: {
+          created_at: string
+          explanation: string
+          id: string
+          quote: string
+          session_id: string | null
+          user_input: string
+        }
+        Insert: {
+          created_at?: string
+          explanation: string
+          id?: string
+          quote: string
+          session_id?: string | null
+          user_input: string
+        }
+        Update: {
+          created_at?: string
+          explanation?: string
+          id?: string
+          quote?: string
+          session_id?: string | null
+          user_input?: string
+        }
+        Relationships: []
+      }
+      daily_reflections: {
+        Row: {
+          created_at: string
+          date: string
+          explanation: string
+          id: string
+          quote: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          explanation: string
+          id?: string
+          quote: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          explanation?: string
+          id?: string
+          quote?: string
+        }
+        Relationships: []
+      }
+      favorites: {
+        Row: {
+          content_id: string
+          content_type: string
+          created_at: string
+          id: string
+          session_id: string
+        }
+        Insert: {
+          content_id: string
+          content_type: string
+          created_at?: string
+          id?: string
+          session_id: string
+        }
+        Update: {
+          content_id?: string
+          content_type?: string
+          created_at?: string
+          id?: string
+          session_id?: string
+        }
+        Relationships: []
+      }
       generated_quotes: {
         Row: {
           author: string
@@ -59,6 +134,51 @@ export type Database = {
           id?: string
           read_time?: string
           title?: string
+        }
+        Relationships: []
+      }
+      posts: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string | null
+          display_order: number | null
+          excerpt: string | null
+          id: string
+          image_url: string | null
+          published_at: string | null
+          scheduled_for: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number | null
+          excerpt?: string | null
+          id?: string
+          image_url?: string | null
+          published_at?: string | null
+          scheduled_for?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number | null
+          excerpt?: string | null
+          id?: string
+          image_url?: string | null
+          published_at?: string | null
+          scheduled_for?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
         }
         Relationships: []
       }

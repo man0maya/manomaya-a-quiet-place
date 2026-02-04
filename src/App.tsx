@@ -6,15 +6,13 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import Index from "./pages/Index";
 import Gallery from "./pages/Gallery";
-import Quotes from "./pages/Quotes";
-import Stories from "./pages/Stories";
-import StoryDetail from "./pages/StoryDetail";
+import Feed from "./pages/Feed";
 import About from "./pages/About";
 import NotFound from "./pages/NotFound";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import AdminStories from "./pages/admin/AdminStories";
-import AdminQuotes from "./pages/admin/AdminQuotes";
+import AdminPosts from "./pages/admin/AdminPosts";
+import AdminAnalytics from "./pages/admin/AdminAnalytics";
 
 const queryClient = new QueryClient();
 
@@ -28,15 +26,14 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/gallery" element={<Gallery />} />
-            <Route path="/quotes" element={<Quotes />} />
-            <Route path="/stories" element={<Stories />} />
-            <Route path="/stories/:id" element={<StoryDetail />} />
+            <Route path="/feed" element={<Feed />} />
+            <Route path="/reflections" element={<Feed />} />
             <Route path="/about" element={<About />} />
             {/* Admin Routes */}
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/stories" element={<AdminStories />} />
-            <Route path="/admin/quotes" element={<AdminQuotes />} />
+            <Route path="/admin/posts" element={<AdminPosts />} />
+            <Route path="/admin/analytics" element={<AdminAnalytics />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

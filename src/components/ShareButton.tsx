@@ -1,4 +1,4 @@
-import { Share2, Twitter, Facebook, Link as LinkIcon, Check } from "lucide-react";
+import { Share2, Twitter, Facebook, Link as LinkIcon, Check, MessageCircle, Instagram } from "lucide-react";
 import { useState } from "react";
 import {
   DropdownMenu,
@@ -18,11 +18,11 @@ interface ShareButtonProps {
 const ShareButton = ({ title, text, url, className }: ShareButtonProps) => {
   const [copied, setCopied] = useState(false);
   const shareUrl = url || window.location.href;
-  const shareText = `${text} - ${title}`;
+  const shareText = `${text}\n\n— manomaya`;
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
@@ -38,6 +38,20 @@ const ShareButton = ({ title, text, url, className }: ShareButtonProps) => {
   const handleShareFacebook = () => {
     const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`;
     window.open(facebookUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const handleShareWhatsApp = () => {
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`${shareText}\n\n${shareUrl}`)}`;
+    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const handleShareInstagram = () => {
+    // Instagram doesn't have a direct share URL, so we copy to clipboard
+    navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    // Open Instagram (on mobile, this may open the app)
+    window.open("https://www.instagram.com/manomaya/", "_blank", "noopener,noreferrer");
   };
 
   const handleNativeShare = async () => {
@@ -88,6 +102,14 @@ const ShareButton = ({ title, text, url, className }: ShareButtonProps) => {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem onClick={handleShareWhatsApp} className="cursor-pointer">
+          <MessageCircle size={16} className="mr-2" />
+          Share on WhatsApp
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleShareInstagram} className="cursor-pointer">
+          <Instagram size={16} className="mr-2" />
+          Copy for Instagram
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={handleShareTwitter} className="cursor-pointer">
           <Twitter size={16} className="mr-2" />
           Share on X
@@ -99,7 +121,7 @@ const ShareButton = ({ title, text, url, className }: ShareButtonProps) => {
         <DropdownMenuItem onClick={handleCopyLink} className="cursor-pointer">
           {copied ? (
             <>
-              <Check size={16} className="mr-2 text-green-500" />
+              <Check size={16} className="mr-2 text-primary" />
               Copied!
             </>
           ) : (
