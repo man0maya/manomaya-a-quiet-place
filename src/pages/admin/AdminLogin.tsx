@@ -4,12 +4,13 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
-import { Flower2, Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import manomayaLogo from '@/assets/manomaya-logo.png';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -63,7 +64,7 @@ export default function AdminLogin() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-3">
-            <Flower2 className="w-10 h-10 text-primary" />
+            <img src={manomayaLogo} alt="Manomaya" className="w-10 h-10 rounded-full object-cover" />
             <span className="font-serif text-2xl text-foreground">Manomaya</span>
           </Link>
           <p className="text-muted-foreground mt-2">Admin Portal</p>

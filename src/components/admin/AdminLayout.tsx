@@ -3,8 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, 
-  BookOpen, 
-  Quote, 
+  FileText, 
+  BarChart3, 
   LogOut, 
   Menu, 
   X,
@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import manomayaLogo from '@/assets/manomaya-logo.png';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -22,8 +23,8 @@ interface AdminLayoutProps {
 
 const navItems = [
   { path: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { path: '/admin/stories', label: 'Stories', icon: BookOpen },
-  { path: '/admin/quotes', label: 'Quotes', icon: Quote },
+  { path: '/admin/posts', label: 'Notes', icon: FileText },
+  { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
 ];
 
 export default function AdminLayout({ children, title }: AdminLayoutProps) {
@@ -58,7 +59,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
           <Menu className="w-6 h-6 text-foreground" />
         </button>
         <div className="flex items-center gap-2">
-          <Flower2 className="w-6 h-6 text-primary" />
+          <img src={manomayaLogo} alt="Manomaya" className="w-8 h-8 rounded-full object-cover" />
           <span className="font-serif text-lg text-foreground">Manomaya</span>
         </div>
         <div className="w-10" />
@@ -142,7 +143,7 @@ function SidebarContent({ onClose, onSignOut, isActive, userEmail }: SidebarCont
       {/* Header */}
       <div className="h-16 flex items-center justify-between px-6 border-b border-border">
         <Link to="/admin" className="flex items-center gap-3">
-          <Flower2 className="w-8 h-8 text-primary" />
+          <img src={manomayaLogo} alt="Manomaya" className="w-8 h-8 rounded-full object-cover" />
           <span className="font-serif text-xl text-foreground">Manomaya</span>
         </Link>
         {onClose && (
