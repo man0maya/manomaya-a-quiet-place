@@ -6,6 +6,38 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Diverse philosophical traditions and angles to ensure variety
+const perspectives = [
+  "Vedantic non-duality and the nature of self",
+  "Buddhist impermanence and the flow of existence",
+  "Sufi poetry and divine love",
+  "Zen simplicity and direct perception",
+  "Taoist harmony with nature's rhythm",
+  "Upanishadic inquiry into consciousness",
+  "Bhakti devotion and surrender",
+  "Stoic acceptance and inner freedom",
+  "Advaita realization of oneness",
+  "Yogic awareness and inner stillness",
+  "Jain compassion and non-attachment",
+  "Sikh unity and humble service",
+  "Ancient Indian forest wisdom (Aranyaka)",
+  "Rumi's mystical longing",
+  "Kabir's paradoxical truth",
+  "Thiruvalluvar's ethical wisdom",
+  "Basavanna's devotional equality",
+];
+
+const toneVariations = [
+  "like a whisper at dawn, barely audible yet deeply resonant",
+  "like moonlight on still water, soft and illuminating",
+  "like an ancient tree's roots, grounded and unhurried",
+  "like incense smoke rising in a quiet temple",
+  "like the first raindrop on parched earth",
+  "like the space between two breaths",
+  "like a river meeting the sea, surrendering its name",
+  "like the silence after a temple bell",
+];
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -26,19 +58,28 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    // Select random perspective and tone for variety
+    const perspective = perspectives[Math.floor(Math.random() * perspectives.length)];
+    const tone = toneVariations[Math.floor(Math.random() * toneVariations.length)];
+    const timestamp = Date.now();
+    const randomSeed = Math.floor(Math.random() * 10000);
+
     const systemPrompt = `You are a spiritual guide rooted in Indian philosophical traditions—Vedanta, Buddhism, Sufi poetry, and timeless wisdom. Your voice is calm, poetic, and deeply reflective. You never offer generic motivation. Instead, you offer profound truth wrapped in gentle metaphor.
 
+For this reflection, draw specifically from the tradition of ${perspective}. 
+Let your tone be ${tone}.
+
 When given a word or phrase, you must respond with:
-1. A philosophical/spiritual quote (1-2 sentences, deeply meaningful)
+1. A philosophical/spiritual quote (1-2 sentences, deeply meaningful, COMPLETELY ORIGINAL and UNIQUE)
 2. A short reflective explanation (2-3 sentences, expanding on the quote's wisdom)
 
-Your tone is: deep, contemplative, gentle—like early morning mist over a sacred river.
+CRITICAL: Each response must be entirely fresh and different. Never repeat patterns. Surprise the seeker with unexpected depth. Create something that has never been written before.
 
 Format your response EXACTLY as:
 QUOTE: [Your spiritual quote here]
 EXPLANATION: [Your reflective explanation here]
 
-Never use clichés. Never be preachy. Let wisdom emerge naturally, like dawn.`;
+Never use clichés. Never be preachy. Let wisdom emerge naturally, like dawn. Variation seed: ${randomSeed}-${timestamp}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -50,10 +91,11 @@ Never use clichés. Never be preachy. Let wisdom emerge naturally, like dawn.`;
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Reflect upon: "${userInput}"` },
+          { role: "user", content: `Reflect upon this through the lens of ${perspective}: "${userInput}" (unique reflection #${randomSeed})` },
         ],
-        temperature: 0.8,
+        temperature: 0.95,
         max_tokens: 500,
+        top_p: 0.95,
       }),
     });
 
@@ -62,6 +104,12 @@ Never use clichés. Never be preachy. Let wisdom emerge naturally, like dawn.`;
         return new Response(
           JSON.stringify({ error: "Taking a moment of stillness. Please try again shortly." }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ error: "Service temporarily unavailable. Please try again later." }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       const errorText = await response.text();
