@@ -1,10 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = [
+  "https://manomaya.lovable.app",
+  "https://id-preview--47e85661-7ea3-4c77-a792-6f9cd27fff13.lovable.app",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  };
+}
+
+const MAX_INPUT_LENGTH = 500;
 
 // Diverse philosophical traditions and angles to ensure variety
 const perspectives = [
@@ -39,6 +50,8 @@ const toneVariations = [
 ];
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -49,6 +62,22 @@ serve(async (req) => {
     if (!userInput || typeof userInput !== "string") {
       return new Response(
         JSON.stringify({ error: "Please provide a word or sentence to reflect upon." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const sanitizedInput = userInput.trim();
+
+    if (sanitizedInput.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "Input cannot be empty." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (sanitizedInput.length > MAX_INPUT_LENGTH) {
+      return new Response(
+        JSON.stringify({ error: `Input too long. Please limit to ${MAX_INPUT_LENGTH} characters.` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -91,7 +120,7 @@ Never use clichés. Never be preachy. Let wisdom emerge naturally, like dawn. Va
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Reflect upon this through the lens of ${perspective}: "${userInput}" (unique reflection #${randomSeed})` },
+          { role: "user", content: `Reflect upon this through the lens of ${perspective}: "${sanitizedInput}" (unique reflection #${randomSeed})` },
         ],
         temperature: 0.95,
         max_tokens: 500,
@@ -135,7 +164,7 @@ Never use clichés. Never be preachy. Let wisdom emerge naturally, like dawn. Va
     const { data: reflection, error: dbError } = await supabase
       .from("ai_reflections")
       .insert({
-        user_input: userInput,
+        user_input: sanitizedInput,
         quote,
         explanation,
         session_id: sessionId || null,
@@ -152,15 +181,16 @@ Never use clichés. Never be preachy. Let wisdom emerge naturally, like dawn. Va
         id: reflection?.id,
         quote,
         explanation,
-        userInput,
+        userInput: sanitizedInput,
         created_at: reflection?.created_at || new Date().toISOString(),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("Error:", error);
+    const corsHeaders = getCorsHeaders(req);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "An unexpected error occurred" }),
+      JSON.stringify({ error: "An unexpected error occurred" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
