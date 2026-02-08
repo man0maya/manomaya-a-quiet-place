@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import Index from "./pages/Index";
 import Gallery from "./pages/Gallery";
@@ -28,6 +28,10 @@ const App = () => (
             <Route path="/gallery" element={<Gallery />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/reflections" element={<Feed />} />
+            {/* Redirect old routes */}
+            <Route path="/quotes" element={<Navigate to="/feed" replace />} />
+            <Route path="/stories" element={<Navigate to="/feed" replace />} />
+            <Route path="/stories/:id" element={<Navigate to="/feed" replace />} />
             <Route path="/about" element={<About />} />
             {/* Admin Routes */}
             <Route path="/admin/login" element={<AdminLogin />} />
