@@ -5,6 +5,7 @@ import { Post } from '@/hooks/usePosts';
 import { useFavorites } from '@/hooks/useFavorites';
 import ShareButton from '@/components/ShareButton';
 import { format } from 'date-fns';
+import DOMPurify from 'dompurify';
 
 interface PostCardProps {
   post: Post;
@@ -62,7 +63,7 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
 
         <div 
           className="prose prose-sm prose-invert max-w-none mb-6 text-foreground/80"
-          dangerouslySetInnerHTML={{ __html: post.content }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content) }}
         />
 
         <div className="flex items-center justify-between border-t border-primary/10 pt-4">
