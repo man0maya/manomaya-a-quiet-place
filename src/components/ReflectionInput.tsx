@@ -47,10 +47,16 @@ export default function ReflectionInput({ onReflectionGenerated }: ReflectionInp
             type="text"
             placeholder="Enter a word or thought..."
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => setInput(e.target.value.slice(0, 500))}
+            maxLength={500}
             disabled={isGenerating}
             className="pr-12 h-12 text-base bg-background/50 border-primary/20 focus:border-primary placeholder:text-muted-foreground/60"
           />
+          {input.length > 400 && (
+            <span className="absolute right-14 top-3.5 text-xs text-muted-foreground">
+              {input.length}/500
+            </span>
+          )}
           <Button
             type="submit"
             size="icon"
