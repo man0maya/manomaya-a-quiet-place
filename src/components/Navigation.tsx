@@ -9,6 +9,7 @@ const navItems = [
   { name: "Reflections", path: "/feed" },
   { name: "Gallery", path: "/gallery" },
   { name: "About", path: "/about" },
+  { name: "Mayaworld", path: "/mayaworld" },
 ];
 
 const Navigation = () => {
