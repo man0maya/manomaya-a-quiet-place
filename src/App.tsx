@@ -13,6 +13,7 @@ import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminPosts from "./pages/admin/AdminPosts";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
+import Mayaworld from "./pages/Mayaworld";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/stories" element={<Navigate to="/feed" replace />} />
             <Route path="/stories/:id" element={<Navigate to="/feed" replace />} />
             <Route path="/about" element={<About />} />
+            <Route path="/mayaworld" element={<Mayaworld />} />
             {/* Admin Routes */}
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin" element={<AdminDashboard />} />
