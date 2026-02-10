@@ -177,7 +177,7 @@ export default function Feed() {
 
         {/* Feed */}
         <section className="px-6 pb-24">
-          <div className="max-w-3xl mx-auto space-y-8">
+          <div className="max-w-[750px] mx-auto space-y-10">
             {isLoading ? (
               <div className="text-center py-12">
                 <RefreshCw className="w-6 h-6 mx-auto text-primary animate-spin" />

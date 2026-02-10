@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Heart, Calendar, User } from 'lucide-react';
+import { Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Post } from '@/hooks/usePosts';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -24,65 +24,73 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
 
   return (
     <motion.article
-      initial={{ opacity: 0, y: 30 }}
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: index * 0.1 }}
-      className="bg-gradient-to-br from-card/80 to-card/50 border border-primary/10 rounded-xl overflow-hidden"
+      transition={{ duration: 0.5, delay: index * 0.08 }}
+      className="bg-card/40 border border-primary/5 rounded-xl overflow-hidden"
     >
       {post.image_url && (
         <div className="aspect-video overflow-hidden">
           <img
             src={post.image_url}
             alt={post.title}
-            className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+            className="w-full h-full object-cover"
           />
         </div>
       )}
 
-      <div className="p-6 md:p-8">
-        <div className="flex items-center gap-3 text-xs text-muted-foreground/70 mb-4">
-          <span className="flex items-center gap-1">
-            <User className="w-3 h-3" />
-            manomaya
+      <div className="p-5 md:p-8">
+        <div className="max-w-[700px] mx-auto">
+          {/* Label */}
+          <span className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground/50 font-medium">
+            Note
           </span>
-          {post.published_at && (
-            <span className="flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
-              {format(new Date(post.published_at), 'MMM d, yyyy')}
-            </span>
-          )}
-        </div>
 
-        <h2 className="text-xl md:text-2xl font-serif text-foreground mb-4 leading-tight">
-          {post.title}
-        </h2>
+          {/* Title */}
+          <h2 className="font-serif text-xl md:text-2xl text-foreground mt-2 mb-3 leading-tight">
+            {post.title}
+          </h2>
 
-        <p className="text-muted-foreground leading-relaxed mb-6">
-          {excerpt}
-        </p>
+          {/* Excerpt as summary */}
+          <p className="text-muted-foreground/70 italic text-sm md:text-base leading-relaxed mb-6">
+            {excerpt}
+          </p>
 
-        <div 
-          className="prose prose-sm prose-invert max-w-none mb-6 text-foreground/80"
-          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content) }}
-        />
+          {/* Body */}
+          <div
+            className="text-foreground/80 text-[15px] leading-[1.7] [&>p]:mb-3 [&>p:last-child]:mb-0"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content) }}
+          />
 
-        <div className="flex items-center justify-between border-t border-primary/10 pt-4">
-          <span className="text-sm font-medium text-primary">— manomaya</span>
+          {/* Footer */}
+          <div className="flex items-center justify-between mt-8 pt-4 border-t border-primary/5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground/50">manomaya</span>
+              {post.published_at && (
+                <>
+                  <span className="text-muted-foreground/30">·</span>
+                  <span className="text-xs text-muted-foreground/40">
+                    {format(new Date(post.published_at), 'MMM d, yyyy')}
+                  </span>
+                </>
+              )}
+            </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleFavorite}
-              className={`h-8 w-8 ${favorited ? 'text-red-500' : 'text-muted-foreground'}`}
-            >
-              <Heart className={`w-4 h-4 ${favorited ? 'fill-current' : ''}`} />
-            </Button>
-            <ShareButton
-              title={post.title}
-              text={excerpt}
-              url={`https://manomaya.lovable.app/notes/${post.id}`}
-            />
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleFavorite}
+                className={`h-7 w-7 ${favorited ? 'text-red-500' : 'text-muted-foreground/40 hover:text-muted-foreground'}`}
+              >
+                <Heart className={`w-3.5 h-3.5 ${favorited ? 'fill-current' : ''}`} />
+              </Button>
+              <ShareButton
+                title={post.title}
+                text={excerpt}
+                url={`https://manomaya.lovable.app/notes/${post.id}`}
+              />
+            </div>
           </div>
         </div>
       </div>
