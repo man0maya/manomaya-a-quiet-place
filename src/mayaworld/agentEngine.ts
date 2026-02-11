@@ -43,11 +43,12 @@ function findNearestOfType(world: World, sx: number, sy: number, type: string): 
 }
 
 function decideNextState(sage: Sage, world: World): { state: SageState; targetX: number; targetY: number } {
-  const { needs, temperament } = sage;
+  const { needs, personality } = sage;
 
-  // Temperament biases
-  const purposeBias = temperament === 'contemplative' ? 15 : temperament === 'wise' ? 10 : 0;
-  const socialBias = temperament === 'social' ? 15 : temperament === 'gentle' ? 10 : 0;
+  // Personality influences thresholds
+  const calmBias = personality.calm * 20;
+  const curiosityBias = personality.curiosity * 15;
+  const moveBias = personality.movementTendency;
 
   if (needs.energy < 25) {
     return { state: 'resting', targetX: sage.x, targetY: sage.y };
@@ -56,33 +57,69 @@ function decideNextState(sage: Sage, world: World): { state: SageState; targetX:
     const hut = findNearestOfType(world, sage.x, sage.y, 'hut');
     return { state: 'walking', targetX: hut.x, targetY: hut.y };
   }
-  if (needs.purpose + purposeBias > 65) {
+  if (needs.purpose + calmBias > 65) {
     const cl = findNearestOfType(world, sage.x, sage.y, 'clearing');
     return { state: 'meditating', targetX: cl.x, targetY: cl.y };
   }
-  if (needs.social + socialBias > 60) {
-    // Walk toward another sage
+  if (needs.social + curiosityBias > 60) {
     const others = world.sages.filter(s => s.name !== sage.name);
     const target = others[Math.floor(Math.random() * others.length)];
     return { state: 'walking', targetX: target.x, targetY: target.y };
   }
 
-  // Default: wander
+  // Personality-driven: curious sages explore more
+  if (Math.random() < personality.curiosity * 0.4) {
+    const forest = findNearestOfType(world, sage.x, sage.y, 'forest');
+    return { state: 'walking', targetX: forest.x, targetY: forest.y };
+  }
+
   const wander = pickRandomWalkable(world);
-  if (Math.random() < 0.3) {
+  if (Math.random() < (1 - moveBias) * 0.4) {
     return { state: 'observing', targetX: sage.x, targetY: sage.y };
   }
   return { state: 'walking', targetX: wander.x, targetY: wander.y };
 }
 
+export function isWalkable(world: World, x: number, y: number): boolean {
+  if (x < 0 || x >= MAP_WIDTH || y < 0 || y >= MAP_HEIGHT) return false;
+  return WALKABLE.includes(world.tiles[y][x].type);
+}
+
 export function tickSage(sage: Sage, world: World): void {
+  // Skip AI for user-controlled sages
+  if (sage.userControlled) {
+    // Still update needs and mood
+    sage.needs.energy = clamp(sage.needs.energy - 0.1, 0, 100);
+    sage.needs.hunger = clamp(sage.needs.hunger + 0.08, 0, 100);
+    sage.needs.social = clamp(sage.needs.social + 0.05, 0, 100);
+    sage.needs.purpose = clamp(sage.needs.purpose + 0.06, 0, 100);
+
+    if (sage.y >= 0 && sage.y < MAP_HEIGHT && sage.x >= 0 && sage.x < MAP_WIDTH) {
+      if (world.tiles[sage.y][sage.x].type === 'hut') {
+        sage.needs.hunger = clamp(sage.needs.hunger - 0.5, 0, 100);
+      }
+      if (world.tiles[sage.y][sage.x].type === 'clearing') {
+        sage.needs.purpose = clamp(sage.needs.purpose - 0.3, 0, 100);
+      }
+    }
+
+    if (sage.dialogueTimer > 0) {
+      sage.dialogueTimer--;
+      if (sage.dialogueTimer <= 0) {
+        sage.dialogue = null;
+        sage.conversationPartner = null;
+      }
+    }
+    sage.mood = deriveMood(sage.needs);
+    return;
+  }
+
   // Update needs gradually
   sage.needs.energy = clamp(sage.needs.energy - 0.15, 0, 100);
   sage.needs.hunger = clamp(sage.needs.hunger + 0.12, 0, 100);
   sage.needs.social = clamp(sage.needs.social + 0.08, 0, 100);
   sage.needs.purpose = clamp(sage.needs.purpose + 0.1, 0, 100);
 
-  // State-based need adjustments
   if (sage.state === 'resting') {
     sage.needs.energy = clamp(sage.needs.energy + 0.8, 0, 100);
   } else if (sage.state === 'meditating') {
@@ -92,14 +129,12 @@ export function tickSage(sage: Sage, world: World): void {
     sage.needs.social = clamp(sage.needs.social - 0.8, 0, 100);
   }
 
-  // Near a hut? Reduce hunger
   if (sage.y >= 0 && sage.y < MAP_HEIGHT && sage.x >= 0 && sage.x < MAP_WIDTH) {
     if (world.tiles[sage.y][sage.x].type === 'hut') {
       sage.needs.hunger = clamp(sage.needs.hunger - 0.5, 0, 100);
     }
   }
 
-  // Dialogue timer
   if (sage.dialogueTimer > 0) {
     sage.dialogueTimer--;
     if (sage.dialogueTimer <= 0) {
@@ -115,9 +150,8 @@ export function tickSage(sage: Sage, world: World): void {
     const dx = sage.targetX - sage.x;
     const dy = sage.targetY - sage.y;
     if (Math.abs(dx) + Math.abs(dy) <= 1) {
-      sage.stateTimer = 0; // arrived
+      sage.stateTimer = 0;
     } else {
-      // Move one step
       let nx = sage.x, ny = sage.y;
       if (Math.abs(dx) > Math.abs(dy)) {
         nx += dx > 0 ? 1 : -1;
@@ -130,37 +164,38 @@ export function tickSage(sage: Sage, world: World): void {
         sage.x = nx;
         sage.y = ny;
       } else {
-        sage.stateTimer = 0; // blocked, pick new action
+        sage.stateTimer = 0;
       }
     }
   }
 
-  // Check for nearby sages to converse
+  // Conversation
   if (sage.state !== 'conversing' && sage.dialogueTimer <= 0) {
     for (const other of world.sages) {
       if (other.name !== sage.name && dist(sage, other) <= 2 && other.dialogueTimer <= 0 && Math.random() < 0.02) {
         sage.state = 'conversing';
         sage.conversationPartner = other.name;
         sage.dialogue = getRandomDialogue();
-        sage.dialogueTimer = 20; // ~5 seconds
+        sage.dialogueTimer = 20;
         sage.stateTimer = 20;
-        other.state = 'conversing';
-        other.conversationPartner = sage.name;
-        other.dialogue = getRandomDialogue();
-        other.dialogueTimer = 20;
-        other.stateTimer = 20;
+        if (!other.userControlled) {
+          other.state = 'conversing';
+          other.conversationPartner = sage.name;
+          other.dialogue = getRandomDialogue();
+          other.dialogueTimer = 20;
+          other.stateTimer = 20;
+        }
         break;
       }
     }
   }
 
-  // State expired? Pick new action
   if (sage.stateTimer <= 0) {
     const next = decideNextState(sage, world);
     sage.state = next.state;
     sage.targetX = next.targetX;
     sage.targetY = next.targetY;
-    sage.stateTimer = 15 + Math.floor(Math.random() * 25); // 4-10 seconds
+    sage.stateTimer = 15 + Math.floor(Math.random() * 25);
   }
 
   sage.mood = deriveMood(sage.needs);

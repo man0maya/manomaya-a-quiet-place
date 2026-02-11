@@ -38,7 +38,7 @@ function generateTerrain(seed: number): Tile[][] {
     }
   }
 
-  // River: a winding path from top-ish to bottom-ish
+  // River
   let rx = cx + Math.floor((noise2D(0, 0, seed + 200) - 0.5) * 6);
   for (let ry = 4; ry < MAP_HEIGHT - 4; ry++) {
     if (tiles[ry][rx].type !== 'water') {
@@ -109,6 +109,7 @@ export function generateWorld(): World {
     return {
       name: def.name,
       temperament: def.temperament,
+      description: def.description,
       x: pos.x,
       y: pos.y,
       targetX: tgt.x,
@@ -119,6 +120,7 @@ export function generateWorld(): World {
         social: 30 + Math.random() * 40,
         purpose: 30 + Math.random() * 40,
       },
+      personality: { ...def.personality },
       state: 'walking' as const,
       mood: 'serene' as const,
       color: def.color,
@@ -126,9 +128,9 @@ export function generateWorld(): World {
       dialogueTimer: 0,
       stateTimer: 0,
       conversationPartner: null,
+      userControlled: false,
     };
   });
 
-  // Pre-simulate a few ticks so the world feels "already in progress"
   return { tiles, width: MAP_WIDTH, height: MAP_HEIGHT, sages, tick: Math.floor(Math.random() * 200) + 50, dayPhase: Math.random() };
 }
