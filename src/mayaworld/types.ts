@@ -13,17 +13,26 @@ export interface Needs {
   purpose: number;
 }
 
+export interface PersonalityWeights {
+  curiosity: number;   // 0-1, affects exploration tendency
+  calm: number;        // 0-1, affects meditation/rest preference
+  movementTendency: number; // 0-1, affects how often they walk
+}
+
 export type SageState = 'walking' | 'resting' | 'meditating' | 'observing' | 'conversing';
 export type Mood = 'serene' | 'restless' | 'content' | 'weary' | 'contemplative';
+export type SimMode = 'observe' | 'authority';
 
 export interface Sage {
   name: string;
   temperament: string;
+  description: string;
   x: number;
   y: number;
   targetX: number;
   targetY: number;
   needs: Needs;
+  personality: PersonalityWeights;
   state: SageState;
   mood: Mood;
   color: string;
@@ -31,6 +40,7 @@ export interface Sage {
   dialogueTimer: number;
   stateTimer: number;
   conversationPartner: string | null;
+  userControlled: boolean;
 }
 
 export interface World {
@@ -39,10 +49,15 @@ export interface World {
   height: number;
   sages: Sage[];
   tick: number;
-  dayPhase: number; // 0-1, 0=dawn, 0.5=dusk, 1=dawn again
+  dayPhase: number;
 }
 
-export interface CoConsciousPrompt {
-  options: { label: string; action: () => void }[];
+export interface InteractionOption {
+  label: string;
+  responseKey: string;
+}
+
+export interface NarrationEvent {
+  text: string;
   timer: number;
 }
