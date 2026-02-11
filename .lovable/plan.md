@@ -1,137 +1,140 @@
 
-# Mayaworld -- Ephemeral Autonomous Simulation
 
-A new route at `/mayaworld` that presents a browser-based, in-memory autonomous world rendered on HTML Canvas. No backend, no persistence -- everything lives and dies in a single browser session.
+# Mayaworld Revamp -- Advanced Interactive Simulation
 
----
-
-## Architecture Overview
-
-The feature is entirely client-side. A set of modular files handle world generation, agent AI, rendering, and session lifecycle. The entry point is a new page component at `/mayaworld`.
-
-```text
-src/
-  pages/
-    Mayaworld.tsx              -- Page component (entry screen + canvas host)
-  mayaworld/
-    constants.ts               -- Sage definitions, access codes, colors, tile types
-    types.ts                   -- All TypeScript interfaces (World, Sage, Tile, etc.)
-    worldGenerator.ts          -- Procedural island generator (terrain, regions)
-    agentEngine.ts             -- Autonomous sage behavior (needs, decisions, movement)
-    renderer.ts                -- HTML Canvas drawing (map, sprites, day/night)
-    sessionController.ts       -- Tick loop, init/destroy, co-conscious prompts
-    dialogueBank.ts            -- Pool of calm dialogue lines for sage interactions
-```
+A complete overhaul of the Mayaworld experience: redesigned entry, cloud transition, dual Observe/Authority modes with direct movement and sage interaction, improved rendering, and floating narration.
 
 ---
 
-## 1. Entry Screen
+## Overview of Changes
 
-A full-screen minimal page with:
-- Calm centered text: a short poetic line (no explanation of mechanics)
-- A single input field for the 4-digit access code
-- On valid code (1111-9999): fade out, generate world, enter simulation
-- On invalid code: gentle shake or brief "The path is not yet open" message
-- Styled to match Manomaya's teal/gold/serif aesthetic
+The current version is minimal -- a code input, a canvas with colored circles, and periodic co-conscious prompts. The revamp transforms it into a rich, interactive spiritual simulation with two distinct user modes, better visuals, and a ceremonial entry experience.
 
-## 2. World Generation (`worldGenerator.ts`)
+---
 
-Procedurally generates a small island map as a 2D tile grid (roughly 40x30 tiles):
+## 1. Redesigned Entry Screen
 
-- **Tile types**: water, sand, grass, forest, stone, hut, river, meditation-clearing
-- **Algorithm**: Start with water, place an island blob using noise/random fill, then scatter regions (a river cutting through, a cluster of huts, forest patches, open clearings)
-- **Mario-inspired**: Top-down view with colorful, distinct tile sprites drawn as simple colored rectangles/shapes on canvas (green grass, dark green trees, blue water, brown huts, sandy paths) -- a charming, blocky open-world feel
-- **Generated fresh** every session -- no two worlds are alike
+Replace the current sparse entry with a full ceremonial intro:
 
-## 3. Characters / Sages (`agentEngine.ts`)
+- Slowly appearing poetic text (staggered fade-in animation, line by line)
+- Full sage roster displayed with codes and one-line temperaments:
+  - 1111 -- Bhrigu -- grounded observer
+  - 2222 -- Pulastya -- wandering thinker
+  - 3333 -- Pulaha -- gentle listener
+  - 4444 -- Kratu -- disciplined mover
+  - 5555 -- Angiras -- curious explorer
+  - 6666 -- Marichi -- quiet contemplator
+  - 7777 -- Atri -- empathic presence
+  - 8888 -- Vashistha -- steady guide
+  - 9999 -- Daksha -- structured planner
+- Code input field and a styled "ENTER THE MAYAWORLD" button
+- Dark background with Manomaya teal/gold palette
 
-Nine sages, each with:
+## 2. Cloud Transition
 
-| Property | Description |
-|---|---|
-| `name` | One of the 9 names (Bhrigu, Pulastya, etc.) |
-| `temperament` | Unique trait (contemplative, nurturing, curious, etc.) |
-| `position` | Current x,y on the map |
-| `target` | Where they're walking to |
-| `needs` | `{ energy, hunger, social, purpose }` -- values 0-100, drift over time |
-| `state` | Current activity: walking, resting, meditating, observing, conversing |
-| `mood` | Derived from needs (serene, restless, content, weary, etc.) |
+After clicking Enter:
+- Canvas fills with animated cloud shapes (layered semi-transparent ovals drifting)
+- Over 3-5 seconds, clouds part (opacity fades, y-positions shift apart)
+- The world gradually appears beneath
+- No loading bar -- feels like the world was always there, just hidden
 
-**Behavior loop** (each tick):
-1. Update needs (slow drift based on current activity)
-2. Evaluate: if a need is high enough, pick an activity to address it (hungry -> walk to hut area, low energy -> rest, low social -> seek another sage, low purpose -> meditate)
-3. If walking, move one step toward target
-4. If near another sage, chance to start a gentle dialogue (2-3 lines from the dialogue bank, displayed as floating text)
-5. Temperament influences preferences (e.g., Atri meditates more, Pulastya socializes more)
+Implemented as a short canvas-based animation phase before the main simulation starts.
 
-## 4. Renderer (`renderer.ts`)
+## 3. Dual Mode System (Observe / Authority)
 
-Draws onto an HTML Canvas element each frame:
+After the cloud transition completes, show a small centered mode selection overlay:
 
-- **Map layer**: Colored tiles in a top-down Mario-style grid
-- **Sage sprites**: Small colored circles or simple figures with their name floating above
-- **Day/night cycle**: Gradual overlay tint shifting from warm gold (day) to deep blue-teal (night) over ~5 minutes real-time
-- **Dialogue bubbles**: Small text near sages when conversing
-- **Co-conscious sage**: Highlighted with a subtle glow; camera follows this sage (viewport scrolls to keep them centered)
-- **Minimal animation**: Gentle bobbing for sages, subtle water shimmer
+### Observe Mode
+- Camera follows the bound sage autonomously
+- User cannot move or interact
+- Floating narration text appears at the bottom periodically:
+  - "Pulaha pauses beneath the trees."
+  - "Angiras watches the river."
+  - Generated from sage state + name + location context
+- The co-conscious prompt system is removed in this mode
 
-## 5. Co-Conscious Mode (`sessionController.ts`)
+### Authority Mode
+- User gains direct control of their bound sage
+- WASD / Arrow key movement (desktop)
+- Tap-to-move on mobile (tap a location, sage walks there)
+- Other 8 sages remain fully autonomous
+- When near another sage (within 2 tiles), an interact button/key prompt appears
+- Pressing interact opens a dialog panel showing:
+  - The other sage's name and current mood
+  - A one-line thought (from dialogue bank)
+  - 2 interaction options (e.g., "Sit together", "Walk with them", "Remain silent")
+  - Sages respond with a dialogue line based on the choice
 
-The user's bound sage behaves autonomously like all others, but at meaningful moments (roughly every 30-60 seconds, or when a decision point arises):
+## 4. Improved Renderer
 
-- The simulation pauses gently (other sages continue slowly or freeze)
-- A small overlay appears at the bottom with 2-3 calm options, e.g.:
-  - "Sit by the river" / "Walk toward the forest" / "Visit Marichi"
-  - "Rest beneath the tree" / "Continue along the path"
-- User selects one; the sage's target/state updates accordingly
-- If the user doesn't respond within ~15 seconds, the sage chooses on its own
+Upgrade the canvas drawing significantly:
 
-## 6. Session Lifecycle
+- **Sage sprites**: Draw simple rishi-style figures instead of plain circles:
+  - Small head circle
+  - Triangular robe body in the sage's color
+  - Subtle circular aura/halo glow behind each sage
+  - Tiny walking animation (slight body sway based on movement)
+- **Better tile details**:
+  - Flowers/grass tufts on grass tiles
+  - Improved tree shapes with layered canopy
+  - Water with animated wave lines
+  - Huts with more detail (door, window dots)
+  - Clearing with soft golden glow particles
+- **Narration text rendering**: Soft text at bottom center of canvas for observe mode narration
+- **Interaction UI**: Dialog panel rendered as canvas overlay or DOM element positioned over canvas
 
-- **Init**: On valid code entry, create world + agents, start tick loop, begin rendering
-- **Running**: Tick loop runs at ~4 ticks/second. Canvas redraws each frame via `requestAnimationFrame`
-- **Exit**: On `beforeunload` or a small exit button, stop loop, clear all references, fade canvas to black
-- No summaries, no scores, no goodbye message -- just silence
+## 5. Updated Types and Constants
 
-## 7. Routing & Navigation
+- Add `description` field to sage definitions (one-line temperaments)
+- Add personality weights: `curiosity`, `calm`, `movementTendency` to Sage type
+- Add `mode` to session: `'observe' | 'authority'`
+- Add `userControlled` flag to Sage to distinguish user-driven movement from AI
+- Add narration text arrays for observe mode
 
-- Add `/mayaworld` route in `App.tsx`
-- Add "Mayaworld" to the navigation bar in `Navigation.tsx`
-- The Mayaworld page renders fullscreen (no Navigation/Footer visible once inside the simulation -- only on the entry screen)
+## 6. Updated Session Controller
+
+- Remove the co-conscious prompt system (replaced by mode-based interaction)
+- Add keyboard input handling for authority mode (WASD/arrows)
+- Add touch/tap input handling for mobile
+- Add mode switching logic
+- Add narration timer for observe mode (show a new narration every 8-15 seconds)
+
+## 7. UI Overlay Elements
+
+Minimal DOM overlays on top of the canvas:
+- **Top left**: Current sage name (existing, keep)
+- **Top right**: "Leave World" button (existing, keep)
+- **Bottom center**: Narration text (observe mode) or interaction panel (authority mode)
+- **Mode switch**: Small button to toggle between Observe/Authority after initial selection
+- No minimap, no clutter
+
+## 8. Session End
+
+- On leave: fade canvas to black over 1.5 seconds
+- Stop all loops, clear state
+- No summary, no goodbye text, just darkness
 
 ---
 
 ## Technical Details
 
-**Files to create:**
+### Files to Modify
 
-| File | Purpose |
+| File | Changes |
 |---|---|
-| `src/pages/Mayaworld.tsx` | Entry screen + canvas host, manages session state |
-| `src/mayaworld/constants.ts` | Access codes, sage names/temperaments, tile colors, config |
-| `src/mayaworld/types.ts` | Interfaces for World, Sage, Tile, Needs, etc. |
-| `src/mayaworld/worldGenerator.ts` | Procedural island generation returning a tile grid |
-| `src/mayaworld/agentEngine.ts` | Sage behavior: need updates, decision-making, movement, dialogue |
-| `src/mayaworld/renderer.ts` | Canvas drawing: map tiles, sages, day/night, dialogue bubbles |
-| `src/mayaworld/sessionController.ts` | Tick loop, co-conscious prompt logic, init/cleanup |
-| `src/mayaworld/dialogueBank.ts` | Array of gentle dialogue lines for sage conversations |
+| `src/mayaworld/types.ts` | Add personality weights, mode type, narration types, interaction types |
+| `src/mayaworld/constants.ts` | Add sage descriptions, narration templates, personality weight defaults |
+| `src/mayaworld/renderer.ts` | Complete rewrite: rishi-style sprites, improved tiles, aura glow, narration rendering |
+| `src/mayaworld/agentEngine.ts` | Add personality weight influence, skip AI tick when sage is user-controlled |
+| `src/mayaworld/sessionController.ts` | Remove co-conscious prompts, add mode management, keyboard/touch input, narration timer |
+| `src/mayaworld/dialogueBank.ts` | Add narration templates and interaction response lines |
+| `src/pages/Mayaworld.tsx` | Complete rewrite: new entry screen, cloud transition, mode selection, authority controls, interaction panel |
 
-**Files to modify:**
+### No new dependencies required
 
-| File | Change |
-|---|---|
-| `src/App.tsx` | Add `/mayaworld` route |
-| `src/components/Navigation.tsx` | Add "Mayaworld" nav link |
+All rendering uses HTML Canvas API. Input handling uses native keyboard/touch events. Animations use requestAnimationFrame.
 
-**No new dependencies required.** Everything uses React, HTML Canvas API, and vanilla JS/TS.
+### No backend or database changes
 
-**No backend or database changes.**
+Everything remains purely client-side and ephemeral.
 
----
-
-## Visual Style Notes
-
-- The entry screen matches Manomaya's dark teal + gold aesthetic
-- The simulation canvas uses a brighter, warmer Mario-inspired palette (greens, blues, browns, golds) while keeping the overall feeling calm
-- Typography inside the simulation (sage names, dialogue) uses the existing Cormorant Garamond / Outfit fonts
-- The co-conscious choice overlay uses a translucent dark panel with soft gold text
