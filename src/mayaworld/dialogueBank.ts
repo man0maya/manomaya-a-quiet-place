@@ -24,11 +24,6 @@ const dialogues = [
   "I sat with grief today. It became peace.",
   "Water knows the shape of every vessel.",
   "There is nowhere to arrive.",
-  "The stars do not compete for brightness.",
-  "I am learning to be unhurried.",
-  "What blooms in darkness needs no witness.",
-  "Each step is both beginning and end.",
-  "The bird sings not for applause.",
 ];
 
 export function getRandomDialogue(): string {
@@ -42,7 +37,6 @@ export function getDialoguePair(): [string, string] {
   return [dialogues[i], dialogues[j]];
 }
 
-// Narration templates for Observe mode
 const narrationTemplates = [
   "{name} pauses beneath the trees.",
   "{name} watches the river in silence.",
@@ -56,9 +50,10 @@ const narrationTemplates = [
   "{name} stands at the edge of the clearing.",
   "{name} listens to something only they can hear.",
   "{name} traces a path through the forest.",
-  "The world moves around {name}, unhurried.",
   "{name} seems to be remembering something.",
-  "{name} finds a quiet place by the water.",
+  "{name} kneels at the mountain shrine.",
+  "{name} gathers petals from the meadow.",
+  "{name} searches the ancient ruins.",
 ];
 
 export function getNarration(sageName: string): string {
@@ -66,7 +61,6 @@ export function getNarration(sageName: string): string {
   return template.replace('{name}', sageName);
 }
 
-// Interaction responses for Authority mode
 const interactionResponses: Record<string, string[]> = {
   sit: [
     "They settle beside you. No words are needed.",
@@ -83,6 +77,11 @@ const interactionResponses: Record<string, string[]> = {
     "Silence holds everything that needs to be said.",
     "You remain. They remain. That is all.",
   ],
+  gift: [
+    "They accept your gift with a gentle nod.",
+    "Their eyes soften as they receive your offering.",
+    "A warm exchange passes between you.",
+  ],
 };
 
 export function getInteractionResponse(action: string): string {
@@ -90,7 +89,6 @@ export function getInteractionResponse(action: string): string {
   return responses[Math.floor(Math.random() * responses.length)];
 }
 
-// Mood-based thoughts for interaction panel
 const moodThoughts: Record<string, string[]> = {
   serene: ["All is well in this moment.", "The world is exactly as it should be.", "Peace settles like morning dew."],
   content: ["There is warmth in this place.", "I have found my rhythm today.", "Simple things bring quiet joy."],
@@ -102,4 +100,62 @@ const moodThoughts: Record<string, string[]> = {
 export function getMoodThought(mood: string): string {
   const thoughts = moodThoughts[mood] || moodThoughts.contemplative;
   return thoughts[Math.floor(Math.random() * thoughts.length)];
+}
+
+// Action result narrations
+const actionNarrations: Record<string, string[]> = {
+  search_found: [
+    "You found something among the undergrowth.",
+    "Something catches your eye.",
+    "A small treasure reveals itself.",
+    "Your search yields a discovery.",
+  ],
+  search_empty: [
+    "You search, but find nothing this time.",
+    "The ground holds its secrets a while longer.",
+    "Nothing reveals itself. Perhaps later.",
+  ],
+  eat: [
+    "You eat slowly, tasting each moment.",
+    "Nourishment fills you quietly.",
+    "A simple meal, a simple joy.",
+  ],
+  meditate: [
+    "You close your eyes. The world grows quiet.",
+    "Stillness envelops you like a warm light.",
+    "Your breath steadies. Purpose deepens.",
+  ],
+  pray: [
+    "The temple hums with an ancient vibration.",
+    "Your prayer rises like incense into silence.",
+    "Something unseen acknowledges your presence.",
+  ],
+  rest: [
+    "You rest. Energy slowly returns.",
+    "The earth supports you as you lie still.",
+    "A gentle peace washes over you.",
+  ],
+  drink: [
+    "Cool water refreshes your spirit.",
+    "You drink deeply from the living water.",
+    "The current shares its clarity with you.",
+  ],
+  craft_offering: [
+    "You craft an offering from gathered materials.",
+    "Your hands shape something meaningful.",
+    "A sacred offering takes form.",
+  ],
+  gift: [
+    "They accept your gift with a gentle nod.",
+    "A warm exchange passes between you.",
+  ],
+  talk: [
+    "Words flow between you like a gentle stream.",
+    "A brief exchange, rich with meaning.",
+  ],
+};
+
+export function getActionNarration(action: string): string {
+  const narrations = actionNarrations[action] || ["Something happens."];
+  return narrations[Math.floor(Math.random() * narrations.length)];
 }
