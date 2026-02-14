@@ -1,5 +1,5 @@
 import { Tile, TileType, World, Sage } from './types';
-import { MAP_WIDTH, MAP_HEIGHT, SAGE_DEFINITIONS } from './constants';
+import { MAP_WIDTH, MAP_HEIGHT, SAGE_DEFINITIONS, WEATHER_CHANGE_MIN, WEATHER_CHANGE_MAX } from './constants';
 
 function distance(x1: number, y1: number, x2: number, y2: number): number {
   return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
@@ -10,63 +10,97 @@ function noise2D(x: number, y: number, seed: number): number {
   return n - Math.floor(n);
 }
 
+// Multi-octave noise for richer terrain
+function fractalNoise(x: number, y: number, seed: number, octaves: number = 3): number {
+  let val = 0, amp = 1, freq = 1, total = 0;
+  for (let i = 0; i < octaves; i++) {
+    val += noise2D(x * freq * 0.15, y * freq * 0.15, seed + i * 100) * amp;
+    total += amp;
+    amp *= 0.5;
+    freq *= 2;
+  }
+  return val / total;
+}
+
 function generateTerrain(seed: number): Tile[][] {
   const tiles: Tile[][] = [];
   const cx = MAP_WIDTH / 2;
   const cy = MAP_HEIGHT / 2;
-  const maxR = Math.min(cx, cy) - 2;
+  const maxR = Math.min(cx, cy) - 3;
 
   for (let y = 0; y < MAP_HEIGHT; y++) {
     tiles[y] = [];
     for (let x = 0; x < MAP_WIDTH; x++) {
       const d = distance(x, y, cx, cy);
-      const nVal = noise2D(x * 0.3, y * 0.3, seed);
-      const islandEdge = maxR - 1 + nVal * 3;
+      const edgeNoise = noise2D(x * 0.2, y * 0.2, seed) * 4;
+      const islandEdge = maxR - 2 + edgeNoise;
 
       let type: TileType = 'water';
       if (d < islandEdge) {
-        // Zone-based layout
-        const normalY = y / MAP_HEIGHT; // 0=top, 1=bottom
-        const normalX = x / MAP_WIDTH;
-        const terrainNoise = noise2D(x * 0.5, y * 0.5, seed + 100);
+        const nY = y / MAP_HEIGHT;
+        const nX = x / MAP_WIDTH;
+        const n1 = fractalNoise(x, y, seed + 100);
+        const n2 = fractalNoise(x, y, seed + 200);
+        const n3 = noise2D(x * 0.4, y * 0.4, seed + 300);
 
-        // Beach ring (near edge)
-        if (d > islandEdge - 2.5) {
-          type = 'beach';
+        // Beach ring
+        if (d > islandEdge - 3) {
+          type = n3 > 0.6 ? 'sand' : 'beach';
         }
-        // Mountain zone (top 20%)
-        else if (normalY < 0.25) {
-          if (terrainNoise > 0.6) type = 'mountain';
-          else if (terrainNoise > 0.45) type = 'stone';
+        // MOUNTAIN ZONE (top 15%) - Mountain of Vows + Vashistha Ridge
+        else if (nY < 0.18) {
+          if (n1 > 0.55) type = 'mountain';
+          else if (n1 > 0.4) type = 'stone';
           else type = 'grass';
         }
-        // Forest band (20-40%)
-        else if (normalY < 0.45) {
-          if (terrainNoise > 0.5) type = 'forest';
-          else if (terrainNoise > 0.3) type = 'grass';
-          else type = 'forest';
+        // FOREST ZONE (15-30%) - Forest of Silence
+        else if (nY < 0.32) {
+          if (n1 > 0.45) type = 'forest';
+          else if (n1 > 0.35) type = 'tall_grass';
+          else type = 'grass';
         }
-        // Center zone (40-65%) - village and lake
-        else if (normalY < 0.65) {
-          if (normalX < 0.45) {
-            // Lake area (left-center)
-            const lakeDist = distance(x, y, cx - 5, cy + 1);
-            if (lakeDist < 3 + terrainNoise * 1.5) type = 'lake';
+        // UPPER-MID ZONE (30-45%) - Daksha Plains + paths
+        else if (nY < 0.45) {
+          if (n1 > 0.7) type = 'tall_grass';
+          else if (n1 > 0.55) type = 'flower';
+          else type = 'grass';
+          // Stone paths
+          if (Math.abs(nX - 0.5) < 0.02 && n3 > 0.3) type = 'stone_path';
+        }
+        // CENTER ZONE (45-60%) - Sage Village + Lake (River of Memory)
+        else if (nY < 0.6) {
+          if (nX < 0.4) {
+            // Lake area
+            const lakeDist = distance(x, y, cx - 10, cy + 2);
+            if (lakeDist < 6 + n2 * 2) type = 'lake';
+            else if (lakeDist < 8) type = 'grass';
+            else type = 'grass';
+          } else if (nX > 0.55 && nX < 0.75) {
+            // Village cluster
+            if (n3 > 0.6) type = 'village';
+            else if (n3 > 0.45) type = 'hut';
             else type = 'grass';
           } else {
-            // Village area (right-center)
-            type = 'grass';
+            type = n1 > 0.6 ? 'tall_grass' : 'grass';
           }
         }
-        // Lower zone (65-85%) - flower fields and groves
-        else if (normalY < 0.85) {
-          if (terrainNoise > 0.65) type = 'grove';
-          else if (terrainNoise > 0.4) type = 'flower';
+        // GARDEN ZONE (60-72%) - Garden of Atri
+        else if (nY < 0.72) {
+          if (nX > 0.3 && nX < 0.6 && n1 > 0.35) type = 'garden';
+          else if (n1 > 0.6) type = 'grove';
+          else if (n1 > 0.4) type = 'flower';
           else type = 'grass';
         }
-        // Bottom zone - sand/beach leading to ruins
+        // LOWER ZONE (72-85%) - clearings + groves
+        else if (nY < 0.85) {
+          if (n1 > 0.65) type = 'grove';
+          else if (n1 > 0.45) type = 'flower';
+          else if (n1 > 0.35) type = 'grass';
+          else type = 'tall_grass';
+        }
+        // BOTTOM ZONE - Beach Ruins
         else {
-          if (terrainNoise > 0.6) type = 'sand';
+          if (n1 > 0.6) type = 'sand';
           else type = 'grass';
         }
       }
@@ -74,86 +108,107 @@ function generateTerrain(seed: number): Tile[][] {
     }
   }
 
-  // River from top to bottom
-  let rx = cx + Math.floor((noise2D(0, 0, seed + 200) - 0.5) * 4);
-  for (let ry = 3; ry < MAP_HEIGHT - 3; ry++) {
+  // === RIVER OF MEMORY (winding river top to bottom) ===
+  let rx = cx + Math.floor((noise2D(0, 0, seed + 400) - 0.5) * 6);
+  for (let ry = 4; ry < MAP_HEIGHT - 4; ry++) {
     if (tiles[ry][rx].type !== 'water' && tiles[ry][rx].type !== 'lake') {
       tiles[ry][rx].type = 'river';
       if (rx + 1 < MAP_WIDTH && tiles[ry][rx + 1].type !== 'water' && tiles[ry][rx + 1].type !== 'lake') {
         tiles[ry][rx + 1].type = 'river';
       }
     }
-    rx += Math.floor((noise2D(rx, ry, seed + 300) - 0.45) * 2.5);
-    rx = Math.max(3, Math.min(MAP_WIDTH - 4, rx));
+    rx += Math.floor((noise2D(rx, ry, seed + 500) - 0.4) * 2.5);
+    rx = Math.max(5, Math.min(MAP_WIDTH - 6, rx));
   }
 
-  // Temple at mountain top
-  const templeX = cx - 1 + Math.floor(noise2D(5, 5, seed + 400) * 3);
-  const templeY = 4 + Math.floor(noise2D(6, 6, seed + 400) * 2);
-  for (let dy = 0; dy < 2; dy++) {
-    for (let dx = 0; dx < 3; dx++) {
-      const ty = templeY + dy;
-      const tx = templeX + dx;
-      if (ty >= 0 && ty < MAP_HEIGHT && tx >= 0 && tx < MAP_WIDTH && tiles[ty][tx].type !== 'water') {
-        tiles[ty][tx].type = 'temple';
-      }
-    }
-  }
-
-  // Huts cluster in center-right
-  const hutX = cx + 2 + Math.floor(noise2D(1, 1, seed + 500) * 4);
-  const hutY = cy - 1 + Math.floor(noise2D(2, 2, seed + 500) * 2);
-  for (let dy = 0; dy < 3; dy++) {
-    for (let dx = 0; dx < 4; dx++) {
-      const ty = hutY + dy;
-      const tx = hutX + dx;
-      if (ty >= 0 && ty < MAP_HEIGHT && tx >= 0 && tx < MAP_WIDTH) {
-        if (tiles[ty][tx].type === 'grass' || tiles[ty][tx].type === 'flower') {
-          if ((dx + dy) % 2 === 0) tiles[ty][tx].type = 'hut';
-          else tiles[ty][tx].type = 'sand';
-        }
-      }
-    }
-  }
-
-  // Ruins at bottom-right
-  const ruinsX = cx + 4 + Math.floor(noise2D(3, 3, seed + 600) * 4);
-  const ruinsY = MAP_HEIGHT - 6 + Math.floor(noise2D(4, 4, seed + 600) * 2);
-  for (let dy = 0; dy < 2; dy++) {
-    for (let dx = 0; dx < 3; dx++) {
-      const ty = ruinsY + dy;
-      const tx = ruinsX + dx;
-      if (ty >= 0 && ty < MAP_HEIGHT && tx >= 0 && tx < MAP_WIDTH && tiles[ty][tx].type !== 'water') {
-        tiles[ty][tx].type = 'ruins';
-      }
-    }
-  }
-
-  // Meditation clearings
+  // === BRIDGES over river ===
   for (let i = 0; i < 3; i++) {
-    const clX = Math.floor(noise2D(i, 0, seed + 700) * (MAP_WIDTH - 10)) + 5;
-    const clY = Math.floor(noise2D(0, i, seed + 700) * (MAP_HEIGHT - 10)) + 5;
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        const ty = clY + dy;
-        const tx = clX + dx;
-        if (ty >= 0 && ty < MAP_HEIGHT && tx >= 0 && tx < MAP_WIDTH) {
-          if (tiles[ty][tx].type !== 'water' && tiles[ty][tx].type !== 'river' && tiles[ty][tx].type !== 'lake' && tiles[ty][tx].type !== 'temple') {
-            tiles[ty][tx].type = 'clearing';
-          }
+    const by = 15 + i * 20 + Math.floor(noise2D(i, 0, seed + 550) * 5);
+    for (let bx = 3; bx < MAP_WIDTH - 3; bx++) {
+      if (tiles[by]?.[bx]?.type === 'river') {
+        tiles[by][bx].type = 'bridge';
+      }
+    }
+  }
+
+  // === TEMPLE (top-center) ===
+  const templeX = cx - 2 + Math.floor(noise2D(5, 5, seed + 600) * 4);
+  const templeY = 6 + Math.floor(noise2D(6, 6, seed + 600) * 3);
+  placeStructure(tiles, templeX, templeY, 4, 3, 'temple');
+
+  // === SHRINES (3 scattered) ===
+  const shrinePositions = [
+    { x: 15, y: 25 }, { x: cx + 12, y: cy - 5 }, { x: cx - 8, y: cy + 15 }
+  ];
+  for (const sp of shrinePositions) {
+    const sx = sp.x + Math.floor(noise2D(sp.x, sp.y, seed + 700) * 4);
+    const sy = sp.y + Math.floor(noise2D(sp.y, sp.x, seed + 700) * 3);
+    placeStructure(tiles, sx, sy, 2, 2, 'shrine');
+  }
+
+  // === CAVE OF MARICHI (right side, mid-height) ===
+  const caveX = MAP_WIDTH - 15 + Math.floor(noise2D(7, 7, seed + 800) * 4);
+  const caveY = cy - 5 + Math.floor(noise2D(8, 8, seed + 800) * 4);
+  placeStructure(tiles, caveX, caveY, 3, 3, 'cave');
+
+  // === RUINS (bottom-right) ===
+  const ruinsX = cx + 10 + Math.floor(noise2D(3, 3, seed + 900) * 6);
+  const ruinsY = MAP_HEIGHT - 12 + Math.floor(noise2D(4, 4, seed + 900) * 3);
+  placeStructure(tiles, ruinsX, ruinsY, 4, 3, 'ruins');
+
+  // === HUT CLUSTERS (Sage Village) ===
+  const hutX = cx + 5;
+  const hutY = cy - 2;
+  for (let dy = 0; dy < 5; dy++) {
+    for (let dx = 0; dx < 6; dx++) {
+      const ty = hutY + dy, tx = hutX + dx;
+      if (ty >= 0 && ty < MAP_HEIGHT && tx >= 0 && tx < MAP_WIDTH) {
+        if (tiles[ty][tx].type === 'grass' || tiles[ty][tx].type === 'tall_grass' || tiles[ty][tx].type === 'flower') {
+          if ((dx + dy) % 3 === 0) tiles[ty][tx].type = 'hut';
+          else if ((dx + dy) % 3 === 1) tiles[ty][tx].type = 'stone_path';
+          else tiles[ty][tx].type = 'village';
         }
       }
     }
+  }
+
+  // === CLEARINGS (meditation spots) ===
+  for (let i = 0; i < 5; i++) {
+    const clX = Math.floor(noise2D(i, 0, seed + 1000) * (MAP_WIDTH - 14)) + 7;
+    const clY = Math.floor(noise2D(0, i, seed + 1000) * (MAP_HEIGHT - 14)) + 7;
+    placeStructure(tiles, clX, clY, 3, 3, 'clearing');
+  }
+
+  // === STONE PATHS connecting village to key locations ===
+  // Village to temple
+  let pathX = hutX + 3;
+  for (let py = hutY; py > templeY + 3; py--) {
+    if (tiles[py]?.[pathX] && tiles[py][pathX].type === 'grass') {
+      tiles[py][pathX].type = 'stone_path';
+    }
+    pathX += Math.floor((noise2D(pathX, py, seed + 1100) - 0.5) * 1.5);
+    pathX = Math.max(5, Math.min(MAP_WIDTH - 5, pathX));
   }
 
   return tiles;
 }
 
+function placeStructure(tiles: Tile[][], x: number, y: number, w: number, h: number, type: TileType) {
+  for (let dy = 0; dy < h; dy++) {
+    for (let dx = 0; dx < w; dx++) {
+      const ty = y + dy, tx = x + dx;
+      if (ty >= 0 && ty < MAP_HEIGHT && tx >= 0 && tx < MAP_WIDTH && tiles[ty][tx].type !== 'water') {
+        tiles[ty][tx].type = type;
+      }
+    }
+  }
+}
+
 function findWalkableTile(tiles: Tile[][], seed: number, index: number): { x: number; y: number } {
-  const walkable: TileType[] = ['grass', 'sand', 'clearing', 'stone', 'hut', 'beach', 'flower'];
-  for (let attempt = 0; attempt < 200; attempt++) {
-    const x = Math.floor(noise2D(attempt, index, seed + 800) * MAP_WIDTH);
-    const y = Math.floor(noise2D(index, attempt, seed + 900) * MAP_HEIGHT);
+  const walkable: TileType[] = ['grass', 'tall_grass', 'sand', 'clearing', 'stone', 'stone_path', 'hut', 'beach', 'flower', 'village', 'garden'];
+  for (let attempt = 0; attempt < 300; attempt++) {
+    const x = Math.floor(noise2D(attempt, index, seed + 1200) * MAP_WIDTH);
+    const y = Math.floor(noise2D(index, attempt, seed + 1300) * MAP_HEIGHT);
     if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT && walkable.includes(tiles[y][x].type)) {
       return { x, y };
     }
@@ -193,8 +248,20 @@ export function generateWorld(): World {
       userControlled: false,
       inventory: [],
       currentAction: null,
+      relationship: 10,
     };
   });
 
-  return { tiles, width: MAP_WIDTH, height: MAP_HEIGHT, sages, tick: Math.floor(Math.random() * 200) + 50, dayPhase: Math.random(), droppedItems: [] };
+  return {
+    tiles,
+    width: MAP_WIDTH,
+    height: MAP_HEIGHT,
+    sages,
+    tick: Math.floor(Math.random() * 200) + 50,
+    dayPhase: Math.random(),
+    droppedItems: [],
+    weather: 'clear',
+    weatherTimer: WEATHER_CHANGE_MIN + Math.floor(Math.random() * (WEATHER_CHANGE_MAX - WEATHER_CHANGE_MIN)),
+    timeOfDay: 'morning',
+  };
 }

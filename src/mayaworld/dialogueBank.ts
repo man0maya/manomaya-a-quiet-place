@@ -24,6 +24,11 @@ const dialogues = [
   "I sat with grief today. It became peace.",
   "Water knows the shape of every vessel.",
   "There is nowhere to arrive.",
+  "The rain speaks to those who remain still.",
+  "I watched the mist dissolve. So did my certainty.",
+  "Every footstep is a prayer the earth receives.",
+  "The cave holds darkness without fear.",
+  "What is a garden but patience made visible?",
 ];
 
 export function getRandomDialogue(): string {
@@ -37,27 +42,69 @@ export function getDialoguePair(): [string, string] {
   return [dialogues[i], dialogues[j]];
 }
 
-const narrationTemplates = [
-  "{name} pauses beneath the trees.",
-  "{name} watches the river in silence.",
-  "{name} sits quietly, eyes half-closed.",
-  "A stillness surrounds {name}.",
-  "{name} walks slowly through the grass.",
-  "{name} gazes at the distant shore.",
-  "{name} breathes with the rhythm of the wind.",
-  "{name} rests among the stones.",
-  "The light falls gently on {name}.",
-  "{name} stands at the edge of the clearing.",
-  "{name} listens to something only they can hear.",
-  "{name} traces a path through the forest.",
-  "{name} seems to be remembering something.",
-  "{name} kneels at the mountain shrine.",
-  "{name} gathers petals from the meadow.",
-  "{name} searches the ancient ruins.",
-];
+const narrationTemplates: Record<string, string[]> = {
+  default: [
+    "{name} pauses beneath the trees.",
+    "{name} watches the river in silence.",
+    "{name} sits quietly, eyes half-closed.",
+    "A stillness surrounds {name}.",
+    "{name} walks slowly through the grass.",
+    "{name} gazes at the distant shore.",
+    "{name} breathes with the rhythm of the wind.",
+    "{name} rests among the stones.",
+    "The light falls gently on {name}.",
+    "{name} stands at the edge of the clearing.",
+    "{name} listens to something only they can hear.",
+    "{name} traces a path through the forest.",
+    "{name} seems to be remembering something.",
+  ],
+  temple: ["{name} kneels at the temple altar.", "{name} offers silent prayers."],
+  shrine: ["{name} lights an invisible flame at the shrine.", "{name} bows before the sacred stone."],
+  mountain: ["{name} surveys the world from the mountain.", "{name} breathes the thin air of the peak."],
+  cave: ["{name} enters the darkness willingly.", "{name} sits in the cave's deepest chamber."],
+  ruins: ["{name} traces ancient markings on the stone.", "{name} searches the rubble."],
+  forest: ["{name} disappears among the trees.", "{name} gathers leaves with quiet purpose."],
+  grove: ["{name} kneels among the ancient trees.", "Golden light surrounds {name} in the grove."],
+  garden: ["{name} tends to something in the garden.", "{name} smells the herbs of the garden."],
+  lake: ["{name} sits by the still water.", "{name} watches ripples cross the lake."],
+  river: ["{name} follows the current with their gaze.", "{name} washes their hands in the river."],
+  village: ["{name} walks among the huts.", "{name} observes village life."],
+  beach: ["{name} leaves footprints in the sand.", "{name} watches the waves."],
+};
 
-export function getNarration(sageName: string): string {
-  const template = narrationTemplates[Math.floor(Math.random() * narrationTemplates.length)];
+const weatherNarrations: Record<string, string[]> = {
+  rain: ["Rain falls softly on the world.", "The rain whispers ancient stories.", "Everything is washed clean."],
+  mist: ["Mist obscures the boundaries.", "The world becomes a dream.", "Shapes dissolve in the fog."],
+  wind: ["Wind sweeps across the land.", "The trees bow and sway.", "Something is carried on the breeze."],
+  clear: ["The sky stretches endlessly.", "Clarity fills every direction."],
+};
+
+const timeNarrations: Record<string, string[]> = {
+  morning: ["Dawn breaks gently.", "The world awakens.", "Morning light paints the ground gold."],
+  evening: ["The sun begins its descent.", "Long shadows stretch across the land.", "Evening brings reflection."],
+  night: ["Stars appear one by one.", "The night holds everything.", "Darkness is not emptiness."],
+};
+
+export function getNarration(sageName: string, tileType?: string, weather?: string, timeOfDay?: string): string {
+  // Sometimes use weather or time narrations
+  if (weather && weather !== 'clear' && Math.random() < 0.2) {
+    const weathers = weatherNarrations[weather] || [];
+    if (weathers.length > 0) return weathers[Math.floor(Math.random() * weathers.length)];
+  }
+  if (timeOfDay && (timeOfDay === 'morning' || timeOfDay === 'evening' || timeOfDay === 'night') && Math.random() < 0.15) {
+    const times = timeNarrations[timeOfDay] || [];
+    if (times.length > 0) return times[Math.floor(Math.random() * times.length)];
+  }
+
+  // Location-specific narrations
+  const locationTemplates = tileType && narrationTemplates[tileType];
+  if (locationTemplates && Math.random() < 0.4) {
+    const template = locationTemplates[Math.floor(Math.random() * locationTemplates.length)];
+    return template.replace('{name}', sageName);
+  }
+
+  const defaults = narrationTemplates.default;
+  const template = defaults[Math.floor(Math.random() * defaults.length)];
   return template.replace('{name}', sageName);
 }
 
@@ -76,6 +123,16 @@ const interactionResponses: Record<string, string[]> = {
     "They nod softly. Understanding passes without words.",
     "Silence holds everything that needs to be said.",
     "You remain. They remain. That is all.",
+  ],
+  listen: [
+    "You listen carefully. Their words carry weight.",
+    "In listening, something opens inside you.",
+    "They speak. You hear more than words.",
+  ],
+  ask: [
+    "They pause before answering. Wisdom takes its time.",
+    "Your question hangs in the air. They smile gently.",
+    "They answer with another question. Both grow deeper.",
   ],
   gift: [
     "They accept your gift with a gentle nod.",
@@ -97,12 +154,25 @@ const moodThoughts: Record<string, string[]> = {
   restless: ["Something calls from beyond the trees.", "My feet wish to wander.", "The stillness presses against me."],
 };
 
-export function getMoodThought(mood: string): string {
+const karmaDialogue: Record<string, string[]> = {
+  cold: ["The world feels distant today.", "Something has shifted.", "Your presence unsettles me."],
+  warm: ["Your presence brings warmth.", "The land responds to your steps.", "I sense good intentions."],
+  sacred: ["You walk with grace.", "The world glows in your presence.", "Your karma illuminates the path."],
+  luminous: ["You have become part of the light.", "The island sings your name.", "Unity approaches."],
+};
+
+export function getMoodThought(mood: string, karma?: number): string {
+  // Karma-influenced dialogue
+  if (karma !== undefined) {
+    if (karma < -50 && Math.random() < 0.3) return karmaDialogue.cold[Math.floor(Math.random() * karmaDialogue.cold.length)];
+    if (karma > 100 && Math.random() < 0.3) return karmaDialogue.luminous[Math.floor(Math.random() * karmaDialogue.luminous.length)];
+    if (karma > 50 && Math.random() < 0.25) return karmaDialogue.sacred[Math.floor(Math.random() * karmaDialogue.sacred.length)];
+    if (karma > 0 && Math.random() < 0.2) return karmaDialogue.warm[Math.floor(Math.random() * karmaDialogue.warm.length)];
+  }
   const thoughts = moodThoughts[mood] || moodThoughts.contemplative;
   return thoughts[Math.floor(Math.random() * thoughts.length)];
 }
 
-// Action result narrations
 const actionNarrations: Record<string, string[]> = {
   search_found: [
     "You found something among the undergrowth.",
@@ -145,6 +215,12 @@ const actionNarrations: Record<string, string[]> = {
     "Your hands shape something meaningful.",
     "A sacred offering takes form.",
   ],
+  ritual: [
+    "A sacred energy flows through the ritual.",
+    "The world pauses as you complete the ceremony.",
+    "Something ancient responds to your devotion.",
+    "Light gathers. The ritual is complete.",
+  ],
   gift: [
     "They accept your gift with a gentle nod.",
     "A warm exchange passes between you.",
@@ -152,6 +228,18 @@ const actionNarrations: Record<string, string[]> = {
   talk: [
     "Words flow between you like a gentle stream.",
     "A brief exchange, rich with meaning.",
+  ],
+  listen: [
+    "You listen deeply. Wisdom enters through silence.",
+    "In listening, you learn more than words.",
+  ],
+  ask: [
+    "A question asked with sincerity always finds an answer.",
+    "They consider your question carefully.",
+  ],
+  sit: [
+    "Sitting together, the world simplifies.",
+    "No words needed. Presence is enough.",
   ],
 };
 
