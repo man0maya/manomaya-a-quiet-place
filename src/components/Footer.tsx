@@ -1,8 +1,11 @@
 import { motion } from "framer-motion";
-import { Instagram } from "lucide-react";
+import { Instagram, Eye } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useVisitorCounter } from "@/hooks/useVisitorCounter";
 
 const Footer = () => {
+  const visitorCount = useVisitorCounter();
+
   return (
     <footer className="section-teal py-16 md:py-24 px-6 border-t border-gold/10">
       <div className="max-w-4xl mx-auto">
@@ -34,6 +37,7 @@ const Footer = () => {
           {/* Nav Links */}
           <div className="flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
             <Link to="/feed" className="hover:text-primary transition-colors">Reflections</Link>
+            <Link to="/reflections-book" className="hover:text-primary transition-colors">Reflections Book</Link>
             <Link to="/gallery" className="hover:text-primary transition-colors">Gallery</Link>
             <Link to="/about" className="hover:text-primary transition-colors">About</Link>
           </div>
@@ -50,13 +54,29 @@ const Footer = () => {
           </a>
         </motion.div>
 
+        {/* Visitor Counter */}
+        {visitorCount !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8, delay: 0.3 }}
+            className="mt-8 flex items-center justify-center gap-2 text-muted-foreground/50"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span className="text-xs tracking-widest uppercase">
+              {visitorCount.toLocaleString()} souls have visited
+            </span>
+          </motion.div>
+        )}
+
         {/* Copyright */}
         <motion.p
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8, delay: 0.4 }}
-          className="mt-12 text-center text-xs text-muted-foreground/40 tracking-wide"
+          className="mt-6 text-center text-xs text-muted-foreground/40 tracking-wide"
         >
           © {new Date().getFullYear()} Manomaya — A quiet place in a noisy world
         </motion.p>
