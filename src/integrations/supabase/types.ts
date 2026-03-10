@@ -89,6 +89,30 @@ export type Database = {
         }
         Relationships: []
       }
+      generated_gallery_images: {
+        Row: {
+          caption: string
+          created_at: string
+          id: string
+          image_url: string
+          theme: string
+        }
+        Insert: {
+          caption: string
+          created_at?: string
+          id?: string
+          image_url: string
+          theme: string
+        }
+        Update: {
+          caption?: string
+          created_at?: string
+          id?: string
+          image_url?: string
+          theme?: string
+        }
+        Relationships: []
+      }
       generated_quotes: {
         Row: {
           author: string
