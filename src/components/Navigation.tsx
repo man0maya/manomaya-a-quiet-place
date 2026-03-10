@@ -7,6 +7,7 @@ import manomayaLogo from "@/assets/manomaya-logo.png";
 const navItems = [
   { name: "Home", path: "/" },
   { name: "Reflections", path: "/feed" },
+  { name: "Reflections Book", path: "/reflections-book" },
   { name: "Gallery", path: "/gallery" },
   { name: "About", path: "/about" },
   { name: "Mayaworld", path: "/mayaworld" },
