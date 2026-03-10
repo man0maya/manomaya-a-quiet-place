@@ -89,25 +89,106 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    // --- Date-seeded unique theme selection ---
+    // Each day maps deterministically to a unique theme + tradition + angle combo
     const themes = [
       "stillness", "presence", "gratitude", "letting go", "inner peace",
       "compassion", "wisdom", "acceptance", "mindfulness", "surrender",
       "love", "truth", "silence", "breath", "awareness", "simplicity",
-      "patience", "healing", "light", "connection", "wholeness"
+      "patience", "healing", "light", "connection", "wholeness",
+      "impermanence", "detachment", "selflessness", "devotion", "equanimity",
+      "karma", "dharma", "moksha", "samsara", "maya (illusion)",
+      "the witness", "non-duality", "emptiness", "the sacred ordinary",
+      "the river of time", "the still point", "the inner flame",
+      "the space between thoughts", "the art of being",
+      "the courage of vulnerability", "the mystery of death",
+      "the gift of suffering", "the seed of intention", "the mirror of self",
+      "the language of the heart", "the dance of opposites",
+      "forgiveness", "humility", "wonder", "solitude", "grace",
+      "the beginner's mind", "sacred listening", "the body as temple",
+      "the dream and the dreamer", "waking up", "the pathless path"
     ];
-    const randomTheme = themes[Math.floor(Math.random() * themes.length)];
 
-    const systemPrompt = `You are a spiritual guide creating a daily reflection for seekers. Your wisdom draws from Vedanta, Buddhism, Sufi poetry, and timeless Indian philosophy. Your voice is calm, poetic, and deeply contemplative.
+    const traditions = [
+      "Advaita Vedanta (non-dual Hindu philosophy)",
+      "Zen Buddhism (Japanese contemplative tradition)",
+      "Sufi mysticism (Islamic inner wisdom)",
+      "Taoism (the Way, wu wei, naturalness)",
+      "Theravada Buddhism (Pali canon, vipassana)",
+      "Bhakti tradition (devotional path of love)",
+      "Stoic philosophy (Epictetus, Marcus Aurelius)",
+      "Tibetan Buddhism (Dzogchen, Mahamudra)",
+      "Kashmir Shaivism (Shiva-consciousness)",
+      "Christian mysticism (Meister Eckhart, St. John of the Cross)",
+      "Indigenous wisdom (animism, sacred interconnection)",
+      "Upanishadic wisdom (Isha, Kena, Mandukya)",
+      "Jain philosophy (ahimsa, anekantavada)",
+      "Yogic philosophy (Patanjali's Yoga Sutras)",
+      "Sikh wisdom (Guru Granth Sahib)",
+    ];
 
-Create a reflection on the theme of "${randomTheme}". Respond with:
-1. A profound spiritual quote (1-2 sentences)
-2. A gentle explanation (2-3 sentences)
+    const angles = [
+      "as experienced during a quiet morning walk",
+      "through the metaphor of water and rivers",
+      "as whispered by an ancient tree to a child",
+      "from the perspective of a monk's last teaching",
+      "as felt during the transition from night to dawn",
+      "through the lens of a single breath",
+      "as understood by someone who has lost everything",
+      "from the silence after a storm",
+      "through the eyes of a gardener tending soil",
+      "as a letter written to one's future self",
+      "from the stillness of a mountain peak",
+      "through the metaphor of fire and transformation",
+      "as a conversation between the moon and the sea",
+      "from the perspective of returning home after years",
+      "as observed in the flight pattern of birds",
+      "through the act of lighting a single lamp in darkness",
+      "as a dying sage's final words to a student",
+      "from the sound of rain on temple stones",
+    ];
 
-Format:
-QUOTE: [Your quote]
-EXPLANATION: [Your explanation]
+    // Use date string as seed for deterministic-but-unique daily selection
+    const dateNum = parseInt(today.replace(/-/g, ''), 10);
+    const themeIdx = dateNum % themes.length;
+    const tradIdx = (dateNum * 7 + 13) % traditions.length;
+    const angleIdx = (dateNum * 11 + 29) % angles.length;
 
-Be original. No clichés. Let wisdom flow like a gentle stream.`;
+    const selectedTheme = themes[themeIdx];
+    const selectedTradition = traditions[tradIdx];
+    const selectedAngle = angles[angleIdx];
+
+    // Fetch last 5 reflections to avoid repetition
+    const { data: recentReflections } = await supabase
+      .from("daily_reflections")
+      .select("quote")
+      .order("date", { ascending: false })
+      .limit(5);
+
+    const avoidList = recentReflections?.map(r => r.quote.substring(0, 60)).join(" | ") || "";
+
+    const systemPrompt = `You are a spiritual poet and philosopher creating a unique daily reflection for Manomaya — a sacred digital space for inner peace, self-discovery, and consciousness exploration. The tone is deeply contemplative, poetic, Indian-rooted but universally human. Never generic, never motivational-poster style. Every word should feel like it was carved in temple stone.
+
+Today's unique parameters:
+- Theme: "${selectedTheme}"
+- Philosophical tradition: ${selectedTradition}
+- Creative angle: ${selectedAngle}
+- Date: ${today} (use this as symbolic context — the season, the day number, the feeling of this moment in time)
+
+STRICT RULES:
+- The quote MUST be completely original — never paraphrase famous quotes
+- Do NOT use these overused phrases: "journey within", "embrace the moment", "find your truth", "inner light shines", "let go and let flow"
+- The quote should feel like it was discovered, not manufactured
+- Draw from the specific tradition mentioned — use its unique vocabulary and metaphors
+- The explanation should deepen the quote, not just restate it
+- Avoid starting with "In the..." or "The path of..."
+- The reflection must feel DIFFERENT from these recent ones: [${avoidList}]
+
+Format strictly as:
+QUOTE: [A profound, original 1-2 sentence spiritual insight]
+EXPLANATION: [A 2-3 sentence contemplation that deepens the quote with specific philosophical context]`;
+
+    const userMessage = `Create today's reflection (${today}) exploring "${selectedTheme}" through the lens of ${selectedTradition}, ${selectedAngle}. Make it utterly unique — something never said before.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -116,13 +197,14 @@ Be original. No clichés. Let wisdom flow like a gentle stream.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Generate today's spiritual reflection on: ${randomTheme}` },
+          { role: "user", content: userMessage },
         ],
-        temperature: 0.9,
-        max_tokens: 500,
+        temperature: 0.95,
+        max_tokens: 600,
+        seed: dateNum,
       }),
     });
 
