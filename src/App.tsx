@@ -14,6 +14,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminPosts from "./pages/admin/AdminPosts";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import Mayaworld from "./pages/Mayaworld";
+import ReflectionsBook from "./pages/ReflectionsBook";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/gallery" element={<Gallery />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/reflections" element={<Feed />} />
+            <Route path="/reflections-book" element={<ReflectionsBook />} />
             {/* Redirect old routes */}
             <Route path="/quotes" element={<Navigate to="/feed" replace />} />
             <Route path="/stories" element={<Navigate to="/feed" replace />} />
