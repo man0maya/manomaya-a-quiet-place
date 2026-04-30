@@ -194,7 +194,7 @@ export default function BlogDetail() {
                 ← More posts
               </Link>
               <div className="flex items-center gap-3">
-                <LikeButton itemId={post.id} itemType="post" />
+                <LikeButton itemId={post.id} itemType="story" />
                 <ShareButton title={post.title} text={description} url={url} />
               </div>
             </motion.footer>
