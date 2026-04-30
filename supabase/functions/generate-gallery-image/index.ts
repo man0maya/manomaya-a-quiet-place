@@ -1,23 +1,77 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_ORIGINS = [
+  "https://manomaya.lovable.app",
+  "https://id-preview--47e85661-7ea3-4c77-a792-6f9cd27fff13.lovable.app",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  const allowedOrigin =
+    ALLOWED_ORIGINS.includes(origin) || origin.endsWith(".lovable.app")
+      ? origin
+      : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Require authenticated admin user
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const userId = claimsData.claims.sub;
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify admin role
+    const { data: roleRow } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!roleRow) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Check how many images we already have today
     const todayStart = new Date();
@@ -34,7 +88,6 @@ serve(async (req) => {
       );
     }
 
-    // Pick a unique theme using date + existing count as seed
     const themes = [
       "A golden lotus floating on misty temple waters at dawn, rays of warm light piercing through fog",
       "An ancient banyan tree with roots descending like curtains, a small oil lamp glowing beneath it at dusk",
@@ -68,7 +121,6 @@ serve(async (req) => {
     const themeIdx = (seed * 7 + offset * 13 + 29) % themes.length;
     const selectedTheme = themes[themeIdx];
 
-    // Generate image via AI
     const prompt = `Create a breathtaking, photorealistic spiritual artwork: ${selectedTheme}. Style: contemplative, serene, rich warm tones with deep shadows, cinematic lighting, high detail. The mood should evoke inner peace and sacred stillness. No text or watermarks.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -110,11 +162,9 @@ serve(async (req) => {
       throw new Error("No image returned from AI");
     }
 
-    // Extract base64 data and convert to bytes
     const base64Data = imageBase64Url.replace(/^data:image\/\w+;base64,/, "");
     const imageBytes = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
 
-    // Upload to storage
     const fileName = `spiritual-${Date.now()}.png`;
     const { error: uploadError } = await supabase.storage
       .from("gallery-images")
@@ -125,14 +175,12 @@ serve(async (req) => {
       throw new Error("Failed to upload image");
     }
 
-    // Get public URL
     const { data: urlData } = supabase.storage
       .from("gallery-images")
       .getPublicUrl(fileName);
 
     const publicUrl = urlData.publicUrl;
 
-    // Save to DB
     const caption = typeof captionText === "string" ? captionText.substring(0, 200) : selectedTheme.split(",")[0];
     const { data: saved, error: dbError } = await supabase
       .from("generated_gallery_images")
@@ -146,7 +194,7 @@ serve(async (req) => {
 
     if (dbError) {
       console.error("DB error:", dbError);
-      throw dbError;
+      throw new Error("Failed to save image");
     }
 
     return new Response(
@@ -154,9 +202,9 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Internal error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: "An unexpected error occurred. Please try again." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
