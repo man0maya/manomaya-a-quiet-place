@@ -36,7 +36,7 @@ const Footer = () => {
         >
           {/* Nav Links */}
           <div className="flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
-            <Link to="/feed" className="hover:text-primary transition-colors">Reflections</Link>
+            <Link to="/blog" className="hover:text-primary transition-colors">Blog</Link>
             <Link to="/reflections-book" className="hover:text-primary transition-colors">Reflections Book</Link>
             <Link to="/gallery" className="hover:text-primary transition-colors">Gallery</Link>
             <Link to="/about" className="hover:text-primary transition-colors">About</Link>

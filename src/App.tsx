@@ -6,7 +6,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import Index from "./pages/Index";
 import Gallery from "./pages/Gallery";
-import Feed from "./pages/Feed";
+import Blog from "./pages/Blog";
+import BlogDetail from "./pages/BlogDetail";
 import About from "./pages/About";
 import NotFound from "./pages/NotFound";
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -28,13 +29,16 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/gallery" element={<Gallery />} />
-            <Route path="/feed" element={<Feed />} />
-            <Route path="/reflections" element={<Feed />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:id" element={<BlogDetail />} />
             <Route path="/reflections-book" element={<ReflectionsBook />} />
             {/* Redirect old routes */}
-            <Route path="/quotes" element={<Navigate to="/feed" replace />} />
-            <Route path="/stories" element={<Navigate to="/feed" replace />} />
-            <Route path="/stories/:id" element={<Navigate to="/feed" replace />} />
+            <Route path="/feed" element={<Navigate to="/blog" replace />} />
+            <Route path="/reflections" element={<Navigate to="/blog" replace />} />
+            <Route path="/quotes" element={<Navigate to="/blog" replace />} />
+            <Route path="/stories" element={<Navigate to="/blog" replace />} />
+            <Route path="/stories/:id" element={<Navigate to="/blog" replace />} />
+            <Route path="/notes/:id" element={<Navigate to="/blog" replace />} />
             <Route path="/about" element={<About />} />
             <Route path="/mayaworld" element={<Mayaworld />} />
             {/* Admin Routes */}
