@@ -426,6 +426,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_visitor_counter: { Args: never; Returns: number }
       is_admin: { Args: never; Returns: boolean }
     }
     Enums: {

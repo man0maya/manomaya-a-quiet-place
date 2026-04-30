@@ -11,24 +11,13 @@ export function useVisitorCounter() {
     const run = async () => {
       try {
         if (!alreadyCounted) {
-          // Increment via raw update
-          const { data: current } = await supabase
-            .from('visitor_counter')
-            .select('count')
-            .eq('id', 1)
-            .maybeSingle();
-
-          if (current) {
-            const newCount = (current.count as number) + 1;
-            await supabase
-              .from('visitor_counter')
-              .update({ count: newCount, updated_at: new Date().toISOString() })
-              .eq('id', 1);
-            setCount(newCount);
+          // Atomic, server-side increment via SECURITY DEFINER function
+          const { data, error } = await supabase.rpc('increment_visitor_counter');
+          if (!error && data !== null && data !== undefined) {
+            setCount(data as number);
             sessionStorage.setItem(SESSION_KEY, 'true');
           }
         } else {
-          // Just read
           const { data } = await supabase
             .from('visitor_counter')
             .select('count')

@@ -249,10 +249,10 @@ EXPLANATION: [A 2-3 sentence contemplation that deepens the quote with specific 
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Internal error:", error);
     const corsHeaders = getCorsHeaders(req);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "An unexpected error occurred" }),
+      JSON.stringify({ error: "An unexpected error occurred. Please try again." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
