@@ -428,6 +428,14 @@ export type Database = {
       }
       increment_visitor_counter: { Args: never; Returns: number }
       is_admin: { Args: never; Returns: boolean }
+      unlike_quote: {
+        Args: { _quote_id: string; _session_id: string }
+        Returns: undefined
+      }
+      unlike_story: {
+        Args: { _session_id: string; _story_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "user"
