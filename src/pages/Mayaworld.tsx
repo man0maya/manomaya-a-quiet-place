@@ -416,6 +416,7 @@ const Mayaworld = () => {
   };
 
   const handleExit = () => {
+    if (worldSeed != null) setFarewell(`World #${worldSeed} dissolves. The next will be different.`);
     setPhase('fading');
     setTimeout(() => { if (sessionRef.current) stopSession(sessionRef.current); sessionRef.current = null; }, 1500);
   };
