@@ -299,9 +299,89 @@ function findWalkableTile(tiles: Tile[][], seed: number, index: number): { x: nu
   return { x: Math.floor(MAP_WIDTH / 2), y: Math.floor(MAP_HEIGHT / 2) };
 }
 
-export function generateWorld(): World {
-  const seed = Math.random() * 100000;
-  const tiles = generateTerrain(seed);
+// Apply a random rigid transform (rotation + mirror) to a tile grid so
+// every session feels structurally different even though the band-based
+// generator is the same. Coordinates inside each Tile are rewritten.
+function transformTiles(tiles: Tile[][], rot: number, mirror: boolean): Tile[][] {
+  const h = tiles.length;
+  const w = tiles[0].length;
+  const out: Tile[][] = [];
+  for (let y = 0; y < h; y++) {
+    out[y] = [];
+    for (let x = 0; x < w; x++) {
+      let sx = x, sy = y;
+      if (mirror) sx = w - 1 - sx;
+      // rot is 0/1/2/3 quarter-turns clockwise on the source coordinates
+      let rx = sx, ry = sy;
+      if (rot === 1) { rx = sy; ry = w - 1 - sx; }
+      else if (rot === 2) { rx = w - 1 - sx; ry = h - 1 - sy; }
+      else if (rot === 3) { rx = h - 1 - sy; ry = sx; }
+      const src = tiles[ry][rx];
+      out[y][x] = { type: src.type, x, y };
+    }
+  }
+  return out;
+}
+
+// Voronoi-style perturbation: pick a few "biome centers" with target tile
+// types and softly bias nearby tiles toward those types. Keeps the base
+// terrain coherent but breaks the strict top-to-bottom band feel.
+function voronoiPerturb(tiles: Tile[][], seed: number) {
+  const h = tiles.length;
+  const w = tiles[0].length;
+  const swappable: Record<string, TileType[]> = {
+    grass: ['flower', 'tall_grass', 'clearing'],
+    tall_grass: ['grass', 'flower', 'forest'],
+    forest: ['grove', 'tall_grass'],
+    flower: ['garden', 'grass'],
+    sand: ['beach', 'grass'],
+    clearing: ['flower', 'grass'],
+  };
+  const numCenters = 5 + Math.floor(noise2D(seed, 1, seed + 9000) * 4);
+  const centers: { x: number; y: number; bias: TileType }[] = [];
+  const palette: TileType[] = ['flower', 'grove', 'tall_grass', 'garden', 'clearing', 'forest'];
+  for (let i = 0; i < numCenters; i++) {
+    centers.push({
+      x: Math.floor(noise2D(i, 0, seed + 9100) * w),
+      y: Math.floor(noise2D(0, i, seed + 9200) * h),
+      bias: palette[Math.floor(noise2D(i, i, seed + 9300) * palette.length)],
+    });
+  }
+  const radius = 9;
+  for (const c of centers) {
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        const ty = c.y + dy, tx = c.x + dx;
+        if (ty < 0 || ty >= h || tx < 0 || tx >= w) continue;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d > radius) continue;
+        const t = tiles[ty][tx];
+        const candidates = swappable[t.type];
+        if (!candidates) continue;
+        const strength = (1 - d / radius) * 0.45;
+        if (noise2D(tx, ty, seed + 9400) < strength) {
+          // bias toward the center's chosen type if it's a valid swap, else random candidate
+          const target = candidates.includes(c.bias)
+            ? c.bias
+            : candidates[Math.floor(noise2D(tx + 1, ty + 1, seed + 9500) * candidates.length)];
+          tiles[ty][tx].type = target;
+        }
+      }
+    }
+  }
+}
+
+export function generateWorld(): { world: World; seed: number } {
+  const seed = Math.floor(Math.random() * 100000);
+  let tiles = generateTerrain(seed);
+
+  // Shuffle the layout so biomes don't always sit in the same bands.
+  const rot = Math.floor(noise2D(seed, seed, seed + 8000) * 4);
+  const mirror = noise2D(seed + 1, seed + 1, seed + 8100) > 0.5;
+  tiles = transformTiles(tiles, rot, mirror);
+
+  // Soft biome reshuffle — adds visible per-session variety
+  voronoiPerturb(tiles, seed);
 
   const sages: Sage[] = SAGE_DEFINITIONS.map((def, i) => {
     const pos = findWalkableTile(tiles, seed, i);
@@ -335,7 +415,7 @@ export function generateWorld(): World {
     };
   });
 
-  return {
+  const world: World = {
     tiles,
     width: MAP_WIDTH,
     height: MAP_HEIGHT,
@@ -347,4 +427,5 @@ export function generateWorld(): World {
     weatherTimer: WEATHER_CHANGE_MIN + Math.floor(Math.random() * (WEATHER_CHANGE_MAX - WEATHER_CHANGE_MIN)),
     timeOfDay: 'morning',
   };
+  return { world, seed };
 }
