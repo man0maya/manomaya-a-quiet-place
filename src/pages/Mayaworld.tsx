@@ -545,29 +545,34 @@ const Mayaworld = () => {
         <>
           {/* Top-left HUD */}
           <div className="absolute top-3 left-3 pointer-events-none">
-            <div className="bg-black/60 backdrop-blur-sm border border-[hsl(var(--primary))]/8 rounded px-3 py-2 min-w-[140px]">
+            <div className="bg-black/80 backdrop-blur-md border border-[hsl(var(--primary))]/30 rounded px-3 py-2 min-w-[150px] shadow-lg">
               <div className="flex items-center gap-2 mb-1">
-                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: SAGE_DEFINITIONS.find(s => s.name === boundNameRef.current)?.color || '#D4AF6A' }} />
-                <span className="text-[hsl(var(--primary))]/50 text-[11px] font-mono tracking-wider">
+                <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: SAGE_DEFINITIONS.find(s => s.name === boundNameRef.current)?.color || '#D4AF6A' }} />
+                <span className="text-[hsl(var(--primary))] text-[12px] font-mono tracking-wider font-semibold">
                   {boundNameRef.current}
                 </span>
               </div>
-              <div className="flex items-center gap-1.5 text-[hsl(var(--foreground))]/20 text-[9px] font-mono">
+              <div className="flex items-center gap-1.5 text-[hsl(var(--foreground))]/85 text-[11px] font-mono">
                 <span>{getTimeIcon(timeOfDay)}</span>
                 <span>{timeOfDay}</span>
-                <span className="text-[hsl(var(--foreground))]/8">|</span>
+                <span className="text-[hsl(var(--foreground))]/40">|</span>
                 <span>{getWeatherIcon(weather)}</span>
                 <span>{weather}</span>
               </div>
               {stats && (
-                <div className="flex items-center gap-1.5 text-[9px] font-mono mt-1">
-                  <span className="text-[hsl(var(--primary))]/30">Lv.{stats.level}</span>
-                  <span className="text-[hsl(var(--foreground))]/8">|</span>
-                  <span className={`${stats.karma >= 50 ? 'text-green-400/40' : stats.karma < 0 ? 'text-red-400/40' : 'text-[hsl(var(--foreground))]/20'}`}>
+                <div className="flex items-center gap-1.5 text-[11px] font-mono mt-1">
+                  <span className="text-[hsl(var(--primary))]">Lv.{stats.level}</span>
+                  <span className="text-[hsl(var(--foreground))]/40">|</span>
+                  <span className={`${stats.karma >= 50 ? 'text-green-400' : stats.karma < 0 ? 'text-red-400' : 'text-[hsl(var(--foreground))]/85'}`}>
                     K:{stats.karma > 0 ? '+' : ''}{stats.karma}
                   </span>
-                  <span className="text-[hsl(var(--foreground))]/8">|</span>
-                  <span className="text-[hsl(var(--foreground))]/15">{mode === 'observe' ? '👁 observe' : '✋ authority'}</span>
+                  <span className="text-[hsl(var(--foreground))]/40">|</span>
+                  <span className="text-[hsl(var(--foreground))]/85">{mode === 'observe' ? '👁 observe' : '✋ authority'}</span>
+                </div>
+              )}
+              {worldSeed != null && (
+                <div className="text-[hsl(var(--foreground))]/55 text-[10px] font-mono mt-1 tracking-wider">
+                  ✦ World #{worldSeed}
                 </div>
               )}
             </div>
@@ -575,10 +580,10 @@ const Mayaworld = () => {
 
           {/* Stats overlay */}
           {showStats && stats && (
-            <div className="absolute top-20 left-3 bg-black/80 backdrop-blur-sm border border-[hsl(var(--primary))]/10 rounded px-4 py-3 min-w-[180px] z-20">
+            <div className="absolute top-28 left-3 bg-black/85 backdrop-blur-md border border-[hsl(var(--primary))]/30 rounded px-4 py-3 min-w-[200px] z-20 shadow-lg">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-[hsl(var(--primary))]/40 text-[9px] font-mono tracking-[0.2em] uppercase">STATS</span>
-                <div className="flex-1 h-px bg-[hsl(var(--primary))]/8" />
+                <span className="text-[hsl(var(--primary))] text-[10px] font-mono tracking-[0.2em] uppercase">STATS</span>
+                <div className="flex-1 h-px bg-[hsl(var(--primary))]/30" />
               </div>
               {[
                 ['Level', stats.level],
@@ -588,34 +593,34 @@ const Mayaworld = () => {
                 ['Insight', stats.insight],
                 ['Bond', stats.bond],
               ].map(([label, value]) => (
-                <div key={String(label)} className="flex justify-between text-[10px] font-mono text-[hsl(var(--foreground))]/25 py-0.5">
+                <div key={String(label)} className="flex justify-between text-[11px] font-mono text-[hsl(var(--foreground))]/85 py-0.5">
                   <span>{label}</span>
-                  <span className="text-[hsl(var(--primary))]/25 ml-3">{value}</span>
+                  <span className="text-[hsl(var(--primary))] ml-3">{value}</span>
                 </div>
               ))}
               {/* XP bar */}
-              <div className="mt-2 h-1.5 bg-black/40 rounded-full overflow-hidden border border-[hsl(var(--primary))]/8">
-                <div className="h-full bg-[hsl(var(--primary))]/25 rounded-full transition-all duration-500" style={{ width: `${(stats.xp / stats.xpToNext) * 100}%` }} />
+              <div className="mt-2 h-1.5 bg-black/60 rounded-full overflow-hidden border border-[hsl(var(--primary))]/30">
+                <div className="h-full bg-[hsl(var(--primary))] rounded-full transition-all duration-500" style={{ width: `${(stats.xp / stats.xpToNext) * 100}%` }} />
               </div>
               {stats.level > 1 && LEVEL_UNLOCKS[stats.level] && (
-                <p className="text-[hsl(var(--primary))]/20 text-[9px] font-mono italic mt-2">✦ {LEVEL_UNLOCKS[stats.level]}</p>
+                <p className="text-[hsl(var(--primary))] text-[10px] font-mono italic mt-2">✦ {LEVEL_UNLOCKS[stats.level]}</p>
               )}
             </div>
           )}
 
           {/* Inventory */}
           {showInventory && (
-            <div className="absolute top-20 left-3 bg-black/80 backdrop-blur-sm border border-[hsl(var(--primary))]/10 rounded px-4 py-3 min-w-[160px] z-20">
+            <div className="absolute top-28 left-3 bg-black/85 backdrop-blur-md border border-[hsl(var(--primary))]/30 rounded px-4 py-3 min-w-[180px] z-20 shadow-lg">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-[hsl(var(--primary))]/40 text-[9px] font-mono tracking-[0.2em] uppercase">INVENTORY</span>
-                <div className="flex-1 h-px bg-[hsl(var(--primary))]/8" />
+                <span className="text-[hsl(var(--primary))] text-[10px] font-mono tracking-[0.2em] uppercase">INVENTORY</span>
+                <div className="flex-1 h-px bg-[hsl(var(--primary))]/30" />
               </div>
               {inventoryItems.length === 0 ? (
-                <p className="text-[hsl(var(--foreground))]/12 text-[10px] font-mono italic">Empty</p>
+                <p className="text-[hsl(var(--foreground))]/60 text-[11px] font-mono italic">Empty</p>
               ) : inventoryItems.map((item, i) => (
-                <div key={i} className="flex justify-between text-[10px] font-mono text-[hsl(var(--foreground))]/30 py-0.5">
+                <div key={i} className="flex justify-between text-[11px] font-mono text-[hsl(var(--foreground))]/85 py-0.5">
                   <span>· {item.name}</span>
-                  <span className="text-[hsl(var(--primary))]/20 ml-3">×{item.count}</span>
+                  <span className="text-[hsl(var(--primary))] ml-3">×{item.count}</span>
                 </div>
               ))}
             </div>
@@ -623,16 +628,16 @@ const Mayaworld = () => {
 
           {/* Moments (journal) */}
           {showMoments && (
-            <div className="absolute top-20 right-3 bg-black/80 backdrop-blur-sm border border-[hsl(var(--primary))]/10 rounded px-4 py-3 min-w-[200px] max-w-[260px] z-20">
+            <div className="absolute top-20 right-3 bg-black/85 backdrop-blur-md border border-[hsl(var(--primary))]/30 rounded px-4 py-3 min-w-[220px] max-w-[280px] z-20 shadow-lg">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-[hsl(var(--primary))]/40 text-[9px] font-mono tracking-[0.2em] uppercase">MOMENTS</span>
-                <div className="flex-1 h-px bg-[hsl(var(--primary))]/8" />
+                <span className="text-[hsl(var(--primary))] text-[10px] font-mono tracking-[0.2em] uppercase">MOMENTS</span>
+                <div className="flex-1 h-px bg-[hsl(var(--primary))]/30" />
               </div>
               {moments.map(m => (
-                <div key={m.id} className={`text-[10px] font-mono mb-1.5 ${m.completed ? 'text-[hsl(var(--primary))]/35' : 'text-[hsl(var(--foreground))]/22'}`}>
+                <div key={m.id} className={`text-[11px] font-mono mb-1.5 ${m.completed ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--foreground))]/85'}`}>
                   <span>{m.completed ? '✦ ' : '○ '}</span>
                   <span className={m.completed ? 'line-through' : ''}>{m.title}</span>
-                  <p className="text-[hsl(var(--foreground))]/10 text-[9px] ml-3">{m.description}</p>
+                  <p className="text-[hsl(var(--foreground))]/55 text-[10px] ml-3">{m.description}</p>
                 </div>
               ))}
             </div>
@@ -641,27 +646,52 @@ const Mayaworld = () => {
           {/* Top right controls */}
           <div className="absolute top-3 right-3 flex gap-2 items-center">
             <button onClick={handleModeToggle}
-              className="text-[hsl(var(--foreground))]/20 hover:text-[hsl(var(--foreground))]/50 text-[9px] font-mono tracking-wider transition-colors bg-black/40 px-2 py-1 rounded border border-white/5 hover:border-white/10">
+              className="text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] text-[11px] font-mono tracking-wider transition-colors bg-black/80 backdrop-blur-md px-3 py-1.5 rounded border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))]">
               {mode === 'observe' ? 'take authority' : 'observe'}
             </button>
             <button onClick={handleExit}
-              className="text-[hsl(var(--foreground))]/15 hover:text-red-400/40 text-[9px] font-mono tracking-wider transition-colors bg-black/40 px-2 py-1 rounded border border-white/5 hover:border-red-400/15">
+              className="text-[hsl(var(--foreground))]/85 hover:text-red-400 text-[11px] font-mono tracking-wider transition-colors bg-black/80 backdrop-blur-md px-3 py-1.5 rounded border border-[hsl(var(--primary))]/30 hover:border-red-400/60">
               leave
             </button>
           </div>
 
+          {/* Ambient ribbon — what's happening in the world */}
+          {ribbon.length > 0 && (
+            <div className="absolute top-28 right-3 max-w-[260px] pointer-events-none z-10">
+              <div className="bg-black/70 backdrop-blur-md border border-[hsl(var(--primary))]/20 rounded px-3 py-2 space-y-1">
+                {ribbon.map((r, i) => (
+                  <p key={r.ts + '-' + i}
+                     className="font-serif text-[hsl(var(--foreground))]/85 text-[12px] leading-snug"
+                     style={{ opacity: 1 - i * 0.28 }}>
+                    · {r.text}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Paused (viewer absent) overlay */}
+          {isPaused && (
+            <div className="absolute inset-0 bg-black/55 backdrop-blur-sm flex items-center justify-center z-40 pointer-events-none">
+              <div className="text-center px-8 py-6 bg-black/80 border border-[hsl(var(--primary))]/30 rounded-lg shadow-xl">
+                <p className="font-serif text-[hsl(var(--foreground))] text-lg mb-2">✦ The world rests</p>
+                <p className="font-serif text-[hsl(var(--foreground))]/75 text-sm italic">It will continue when you return your gaze.</p>
+              </div>
+            </div>
+          )}
+
           {/* Mode prompt */}
           {showModePrompt && mode === 'observe' && (
-            <div className="absolute bottom-20 left-0 right-0 text-center animate-fade-in">
-              <div className="inline-block bg-black/70 backdrop-blur-sm border border-[hsl(var(--primary))]/12 rounded-lg px-8 py-5 shadow-[0_0_40px_rgba(0,0,0,0.5)]">
-                <p className="font-serif text-[hsl(var(--foreground))]/35 text-sm mb-4">Would you like to walk this world?</p>
-                <div className="flex gap-3 justify-center">
+            <div className="absolute bottom-20 left-0 right-0 text-center animate-fade-in px-4">
+              <div className="inline-block bg-black/90 backdrop-blur-md border border-[hsl(var(--primary))]/40 rounded-lg px-8 py-5 shadow-[0_0_40px_rgba(0,0,0,0.6)]">
+                <p className="font-serif text-[hsl(var(--foreground))] text-base mb-4">Would you like to walk this world?</p>
+                <div className="flex gap-3 justify-center flex-wrap">
                   <button onClick={() => setShowModePrompt(false)}
-                    className="text-[hsl(var(--foreground))]/25 hover:text-[hsl(var(--foreground))]/50 text-[10px] font-mono py-2 px-4 border border-[hsl(var(--foreground))]/8 rounded transition-all hover:bg-white/3">
+                    className="text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--foreground))] text-[12px] font-mono py-2 px-4 border border-[hsl(var(--foreground))]/30 rounded transition-all hover:bg-white/10">
                     Continue observing
                   </button>
                   <button onClick={() => handleModeSelect('authority')}
-                    className="text-[hsl(var(--primary))]/60 hover:text-[hsl(var(--primary))] text-[10px] font-mono py-2 px-4 border border-[hsl(var(--primary))]/20 rounded hover:bg-[hsl(var(--primary))]/8 transition-all hover:shadow-[0_0_15px_rgba(212,175,106,0.1)]">
+                    className="text-[hsl(var(--primary))] hover:text-[hsl(var(--primary))] text-[12px] font-mono py-2 px-4 border border-[hsl(var(--primary))]/60 rounded hover:bg-[hsl(var(--primary))]/15 transition-all">
                     ✋ Take authority
                   </button>
                 </div>
@@ -676,10 +706,10 @@ const Mayaworld = () => {
 
           {/* Observe narration */}
           {mode === 'observe' && narration && !showModePrompt && (
-            <div className="absolute bottom-8 left-0 right-0 text-center pointer-events-none"
+            <div className="absolute bottom-8 left-0 right-0 text-center pointer-events-none px-4"
               style={{ opacity: narrationOpacity, transition: 'opacity 1.5s ease' }}>
-              <div className="inline-block bg-black/40 backdrop-blur-sm px-6 py-2 rounded">
-                <p className="font-serif text-[hsl(var(--foreground))]/30 text-sm italic tracking-wide">{narration}</p>
+              <div className="inline-block bg-black/85 backdrop-blur-md px-6 py-3 rounded-lg border border-[hsl(var(--primary))]/25 shadow-lg max-w-xl">
+                <p className="font-serif text-[hsl(var(--foreground))] text-[15px] leading-relaxed">{narration}</p>
               </div>
             </div>
           )}
@@ -687,7 +717,7 @@ const Mayaworld = () => {
           {/* Moment notification */}
           {momentNotif && (
             <div className="absolute top-20 left-0 right-0 text-center pointer-events-none animate-fade-in z-30">
-              <span className="inline-block bg-[hsl(var(--primary))]/10 border border-[hsl(var(--primary))]/25 rounded px-5 py-2.5 font-mono text-[hsl(var(--primary))]/60 text-[11px] tracking-wider shadow-[0_0_20px_rgba(212,175,106,0.1)]">
+              <span className="inline-block bg-[hsl(var(--primary))]/25 border border-[hsl(var(--primary))]/60 rounded px-5 py-2.5 font-mono text-[hsl(var(--primary))] text-[12px] tracking-wider shadow-[0_0_20px_rgba(212,175,106,0.25)]">
                 {momentNotif}
               </span>
             </div>
@@ -695,8 +725,8 @@ const Mayaworld = () => {
 
           {/* Level up notification */}
           {levelUpNotif && (
-            <div className="absolute top-28 left-0 right-0 text-center pointer-events-none animate-fade-in z-30">
-              <span className="inline-block bg-[hsl(var(--primary))]/15 border border-[hsl(var(--primary))]/30 rounded px-5 py-2.5 font-mono text-[hsl(var(--primary))]/70 text-[11px] tracking-wider">
+            <div className="absolute top-32 left-0 right-0 text-center pointer-events-none animate-fade-in z-30">
+              <span className="inline-block bg-[hsl(var(--primary))]/25 border border-[hsl(var(--primary))]/60 rounded px-5 py-2.5 font-mono text-[hsl(var(--primary))] text-[12px] tracking-wider">
                 {levelUpNotif}
               </span>
             </div>
@@ -705,26 +735,26 @@ const Mayaworld = () => {
           {/* Interaction dialog - RPG style bottom panel */}
           {nearbySage && (
             <div className="absolute bottom-0 left-0 right-0 z-20">
-              <div className="bg-black/85 backdrop-blur-sm border-t-2 border-[hsl(var(--primary))]/15 px-6 py-5">
-                <div className="max-w-lg mx-auto">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: SAGE_DEFINITIONS.find(s => s.name === nearbySage.name)?.color }} />
-                    <span className="font-mono text-[hsl(var(--primary))]/60 text-[12px] tracking-wider">{nearbySage.name}</span>
-                    <span className="text-[hsl(var(--foreground))]/15 text-[9px] font-mono">· {nearbySage.mood}</span>
-                    <span className="text-red-300/20 text-[9px] font-mono ml-auto">♡ {nearbySage.relationship}</span>
+              <div className="bg-black/92 backdrop-blur-md border-t-2 border-[hsl(var(--primary))]/50 px-6 py-5 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+                <div className="max-w-xl mx-auto">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SAGE_DEFINITIONS.find(s => s.name === nearbySage.name)?.color }} />
+                    <span className="font-mono text-[hsl(var(--primary))] text-[14px] tracking-wider font-semibold">{nearbySage.name}</span>
+                    <span className="text-[hsl(var(--foreground))]/65 text-[11px] font-mono">· {nearbySage.mood}</span>
+                    <span className="text-red-300/80 text-[11px] font-mono ml-auto">♡ {nearbySage.relationship}</span>
                   </div>
-                  <p className="font-serif text-[hsl(var(--foreground))]/35 text-xs italic mb-4 pl-4 border-l border-[hsl(var(--primary))]/10">
+                  <p className="font-serif text-[hsl(var(--foreground))] text-[15px] leading-relaxed mb-4 pl-4 border-l-2 border-[hsl(var(--primary))]/40">
                     "{nearbySage.thought}"
                   </p>
                   <div className="flex gap-2 flex-wrap">
                     {['sit', 'listen', 'ask', 'silent'].map(act => (
                       <button key={act} onClick={() => handleInteraction(act)}
-                        className="text-[hsl(var(--foreground))]/40 hover:text-[hsl(var(--primary))]/80 text-[10px] font-mono py-1.5 px-3 border border-[hsl(var(--foreground))]/8 rounded hover:border-[hsl(var(--primary))]/20 hover:bg-[hsl(var(--primary))]/5 transition-all">
+                        className="text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] text-[12px] font-mono py-2 px-3.5 border border-[hsl(var(--foreground))]/30 rounded hover:border-[hsl(var(--primary))]/60 hover:bg-[hsl(var(--primary))]/10 transition-all">
                         {act === 'sit' ? '🧘 Sit' : act === 'listen' ? '👂 Listen' : act === 'ask' ? '❓ Ask' : '🤫 Silent'}
                       </button>
                     ))}
                     <button onClick={() => handleAction('gift')}
-                      className="text-[hsl(var(--foreground))]/40 hover:text-[hsl(var(--primary))]/80 text-[10px] font-mono py-1.5 px-3 border border-[hsl(var(--foreground))]/8 rounded hover:border-[hsl(var(--primary))]/20 hover:bg-[hsl(var(--primary))]/5 transition-all">
+                      className="text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] text-[12px] font-mono py-2 px-3.5 border border-[hsl(var(--foreground))]/30 rounded hover:border-[hsl(var(--primary))]/60 hover:bg-[hsl(var(--primary))]/10 transition-all">
                       🎁 Gift
                     </button>
                   </div>
@@ -736,13 +766,13 @@ const Mayaworld = () => {
           {/* Action menu - RPG bottom panel */}
           {showActionMenu && !nearbySage && (
             <div className="absolute bottom-0 left-0 right-0 z-20">
-              <div className="bg-black/85 backdrop-blur-sm border-t-2 border-[hsl(var(--primary))]/15 px-6 py-4">
-                <div className="max-w-lg mx-auto">
-                  <p className="text-[hsl(var(--primary))]/30 text-[9px] font-mono tracking-[0.3em] uppercase mb-3">ACTIONS</p>
+              <div className="bg-black/92 backdrop-blur-md border-t-2 border-[hsl(var(--primary))]/50 px-6 py-4 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+                <div className="max-w-xl mx-auto">
+                  <p className="text-[hsl(var(--primary))] text-[10px] font-mono tracking-[0.3em] uppercase mb-3">ACTIONS</p>
                   <div className="flex gap-2 flex-wrap">
                     {actionMenu.map(a => (
                       <button key={a.action} onClick={() => handleAction(a.action)}
-                        className="text-[hsl(var(--foreground))]/40 hover:text-[hsl(var(--primary))]/80 text-[10px] font-mono py-2 px-4 border border-[hsl(var(--foreground))]/8 rounded hover:border-[hsl(var(--primary))]/20 hover:bg-[hsl(var(--primary))]/5 transition-all"
+                        className="text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] text-[12px] font-mono py-2 px-4 border border-[hsl(var(--foreground))]/30 rounded hover:border-[hsl(var(--primary))]/60 hover:bg-[hsl(var(--primary))]/10 transition-all"
                         title={a.description}>
                         {a.label}
                       </button>
@@ -755,9 +785,9 @@ const Mayaworld = () => {
 
           {/* Feedback */}
           {(interactionResponse || actionFeedback) && !nearbySage && !showActionMenu && (
-            <div className="absolute bottom-10 left-0 right-0 text-center pointer-events-none">
-              <div className="inline-block bg-black/50 backdrop-blur-sm px-5 py-2 rounded border border-[hsl(var(--primary))]/8">
-                <p className="font-serif text-[hsl(var(--foreground))]/35 text-sm italic tracking-wide">
+            <div className="absolute bottom-10 left-0 right-0 text-center pointer-events-none px-4">
+              <div className="inline-block bg-black/85 backdrop-blur-md px-5 py-3 rounded-lg border border-[hsl(var(--primary))]/30 shadow-lg max-w-xl">
+                <p className="font-serif text-[hsl(var(--foreground))] text-[15px] leading-relaxed">
                   {interactionResponse || actionFeedback}
                 </p>
               </div>
@@ -766,7 +796,7 @@ const Mayaworld = () => {
 
           {/* Controls hint */}
           {mode === 'authority' && (
-            <div className="absolute bottom-2 left-3 text-[hsl(var(--foreground))]/8 text-[8px] font-mono tracking-wider">
+            <div className="absolute bottom-2 left-3 text-[hsl(var(--foreground))]/65 text-[10px] font-mono tracking-wider bg-black/40 px-2 py-0.5 rounded">
               WASD move · E action · I inv · J journal · P stats
             </div>
           )}
