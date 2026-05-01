@@ -86,6 +86,9 @@ const Mayaworld = () => {
     if (phase !== 'clouds') return;
     const session = createSession(boundNameRef.current);
     sessionRef.current = session;
+    setWorldSeed(session.worldSeed);
+    // Start paused — the world only awakens once the viewer is actually watching
+    pauseSession(session);
 
     startSession(session, (world) => {
       setWeather(world.weather);
