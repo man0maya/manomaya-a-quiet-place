@@ -81,37 +81,35 @@ const LikeButton = ({ itemId, itemType, className }: LikeButtonProps) => {
     try {
       if (itemType === "quote") {
         if (isLiked) {
-          await supabase
-            .from("quote_likes")
-            .delete()
-            .eq("quote_id", itemId)
-            .eq("session_id", sessionId);
-          
+          await supabase.rpc("unlike_quote", {
+            _quote_id: itemId,
+            _session_id: sessionId,
+          });
+
           setIsLiked(false);
           setLikeCount(prev => Math.max(0, prev - 1));
         } else {
           await supabase
             .from("quote_likes")
             .insert({ quote_id: itemId, session_id: sessionId });
-          
+
           setIsLiked(true);
           setLikeCount(prev => prev + 1);
         }
       } else {
         if (isLiked) {
-          await supabase
-            .from("story_likes")
-            .delete()
-            .eq("story_id", itemId)
-            .eq("session_id", sessionId);
-          
+          await supabase.rpc("unlike_story", {
+            _story_id: itemId,
+            _session_id: sessionId,
+          });
+
           setIsLiked(false);
           setLikeCount(prev => Math.max(0, prev - 1));
         } else {
           await supabase
             .from("story_likes")
             .insert({ story_id: itemId, session_id: sessionId });
-          
+
           setIsLiked(true);
           setLikeCount(prev => prev + 1);
         }
