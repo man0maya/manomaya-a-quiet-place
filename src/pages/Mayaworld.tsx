@@ -201,6 +201,44 @@ const Mayaworld = () => {
     startRenderLoop();
   }, [phase]);
 
+  // Viewer-presence gate: world ticks only when tab is visible AND focused
+  useEffect(() => {
+    if (phase !== 'world') return;
+    const session = sessionRef.current;
+    if (!session) return;
+
+    const evaluate = () => {
+      const visible = document.visibilityState === 'visible' && document.hasFocus();
+      if (visible) {
+        resumeSession(session);
+        setIsPaused(false);
+      } else {
+        pauseSession(session);
+        setIsPaused(true);
+      }
+    };
+    evaluate();
+    document.addEventListener('visibilitychange', evaluate);
+    window.addEventListener('focus', evaluate);
+    window.addEventListener('blur', evaluate);
+    return () => {
+      document.removeEventListener('visibilitychange', evaluate);
+      window.removeEventListener('focus', evaluate);
+      window.removeEventListener('blur', evaluate);
+    };
+  }, [phase]);
+
+  // Poll the ambient ribbon
+  useEffect(() => {
+    if (phase !== 'world') return;
+    const id = setInterval(() => {
+      const session = sessionRef.current;
+      if (!session) return;
+      setRibbon(getRibbon(session));
+    }, 1500);
+    return () => clearInterval(id);
+  }, [phase]);
+
   const syncStats = (session: Session) => {
     setStats({ ...session.stats });
     setMoments(session.moments.map(m => ({ ...m })));
