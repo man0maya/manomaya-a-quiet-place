@@ -211,14 +211,18 @@ export function startSession(
   session.running = true;
   session.intervalId = window.setInterval(() => {
     if (!session.running) return;
+    if (session.paused) return; // viewer-presence gate: world rests when nobody is watching
     const world = session.world;
     world.tick++;
     updateWorldCycle(world);
     handleAuthorityMovement(session);
     for (const sage of world.sages) tickSage(sage, world);
+    maybeTriggerEvent(session);
     onTick(world);
   }, 1000 / TICKS_PER_SECOND);
 }
+
+export function getRibbon(session: Session) { return session.ribbon.slice(0, 3); }
 
 export function stopSession(session: Session) {
   session.running = false;
