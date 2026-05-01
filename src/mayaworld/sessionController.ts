@@ -5,9 +5,11 @@ import { TICKS_PER_SECOND, MAP_WIDTH, MAP_HEIGHT, MOVE_COOLDOWN_MS, ACTION_DEFS,
 
 export interface Session {
   world: World;
+  worldSeed: number;
   boundSageName: string;
   intervalId: number | null;
   running: boolean;
+  paused: boolean;
   mode: SimMode;
   keysDown: Set<string>;
   lastMoveTime: number;
@@ -18,18 +20,69 @@ export interface Session {
   lastAction: SageAction | null;
   lastActionTile: string | null;
   lastGiftTarget: string | null;
+  recentDialogueIdx: number[]; // ring buffer to avoid repeats
+  ribbon: { text: string; ts: number }[];
+  nextEventTick: number;
+  activeEvent: { kind: string; x: number; y: number; ttl: number } | null;
 }
 
 export function createSession(boundSageName: string): Session {
-  const world = generateWorld();
+  const { world, seed } = generateWorld();
   return {
-    world, boundSageName, intervalId: null, running: false,
+    world, worldSeed: seed, boundSageName, intervalId: null, running: false, paused: false,
     mode: 'observe', keysDown: new Set(), lastMoveTime: 0, showInventory: false,
     stats: createDefaultStats(),
     moments: MOMENTS.map(m => ({ ...m })),
     completedMomentIds: new Set(),
     lastAction: null, lastActionTile: null, lastGiftTarget: null,
+    recentDialogueIdx: [],
+    ribbon: [],
+    nextEventTick: 300 + Math.floor(Math.random() * 300),
+    activeEvent: null,
   };
+}
+
+export function pauseSession(session: Session) { session.paused = true; }
+export function resumeSession(session: Session) { session.paused = false; }
+
+function pushRibbon(session: Session, text: string) {
+  session.ribbon.unshift({ text, ts: Date.now() });
+  if (session.ribbon.length > 6) session.ribbon.length = 6;
+}
+
+function maybeTriggerEvent(session: Session) {
+  const w = session.world;
+  if (session.activeEvent) {
+    session.activeEvent.ttl--;
+    if (session.activeEvent.ttl <= 0) session.activeEvent = null;
+    return;
+  }
+  if (w.tick < session.nextEventTick) return;
+
+  const candidates: string[] = ['fireflies', 'leaf_drift', 'bloom', 'birdsong'];
+  if (w.timeOfDay === 'night') candidates.push('meteor', 'meteor');
+  if (w.weather === 'clear' && w.timeOfDay !== 'night') candidates.push('rainbow');
+  const kind = candidates[Math.floor(Math.random() * candidates.length)];
+  const bound = w.sages.find(s => s.name === session.boundSageName);
+  const cx = bound ? bound.x : Math.floor(w.width / 2);
+  const cy = bound ? bound.y : Math.floor(w.height / 2);
+  session.activeEvent = {
+    kind,
+    x: cx + Math.floor((Math.random() - 0.5) * 20),
+    y: cy + Math.floor((Math.random() - 0.5) * 14),
+    ttl: 60 + Math.floor(Math.random() * 60),
+  };
+  session.nextEventTick = w.tick + 360 + Math.floor(Math.random() * 360);
+
+  const labels: Record<string, string> = {
+    fireflies: 'Fireflies stir near the grove',
+    leaf_drift: 'Leaves drift across the air',
+    bloom: 'A patch of flowers blooms',
+    birdsong: 'Distant birdsong rises',
+    meteor: 'A meteor crosses the night',
+    rainbow: 'A rainbow forms over the lake',
+  };
+  pushRibbon(session, labels[kind] || 'Something stirs');
 }
 
 export function setMode(session: Session, mode: SimMode) {
@@ -158,14 +211,18 @@ export function startSession(
   session.running = true;
   session.intervalId = window.setInterval(() => {
     if (!session.running) return;
+    if (session.paused) return; // viewer-presence gate: world rests when nobody is watching
     const world = session.world;
     world.tick++;
     updateWorldCycle(world);
     handleAuthorityMovement(session);
     for (const sage of world.sages) tickSage(sage, world);
+    maybeTriggerEvent(session);
     onTick(world);
   }, 1000 / TICKS_PER_SECOND);
 }
+
+export function getRibbon(session: Session) { return session.ribbon.slice(0, 3); }
 
 export function stopSession(session: Session) {
   session.running = false;

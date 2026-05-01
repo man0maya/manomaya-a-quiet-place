@@ -29,17 +29,63 @@ const dialogues = [
   "Every footstep is a prayer the earth receives.",
   "The cave holds darkness without fear.",
   "What is a garden but patience made visible?",
+  // expanded — no AI, just hand-written variety
+  "The bell sounds once. The mind hears it always.",
+  "A bird calls. I do not know the answer.",
+  "Even my breath is borrowed.",
+  "The lamp does not argue with the dark.",
+  "I have been walking and arriving at once.",
+  "Some questions ripen. Others compost.",
+  "The moon practices being seen.",
+  "Salt remembers the ocean it left.",
+  "A single pine holds the whole hillside.",
+  "What I called doubt was simply attention.",
+  "Hands open more honestly than mouths.",
+  "The path is patient with the slow.",
+  "Sleep is also a kind of sitting.",
+  "I asked the wind for direction. It offered company.",
+  "Even the temple was once a tree.",
+  "The stream practices forgetting.",
+  "There is enough quiet, if I listen for it.",
+  "I leave footprints. The grass forgives them.",
+  "The clouds are revising themselves.",
+  "A bowl of water teaches more than a book.",
+  "Today I let the morning lead.",
+  "The bell of evening rings without being struck.",
+  "Loneliness is solitude that lost its name.",
+  "I sit until the chair sits too.",
+  "Mountains never argue about who is taller.",
+  "A sip of rain is also a teaching.",
+  "The path keeps me, more than I keep it.",
+  "I traded my plans for a longer breath.",
+  "The dust on the shrine is also an offering.",
+  "Dawn does not rehearse.",
 ];
 
+// Per-sage no-repeat ring buffer (in-memory, ephemeral)
+const recent: Map<string, number[]> = new Map();
+const RECENT_SIZE = 12;
+
+function pickFreshDialogue(key: string): string {
+  const used = recent.get(key) || [];
+  let attempts = 0;
+  let i = Math.floor(Math.random() * dialogues.length);
+  while (used.includes(i) && attempts < 20) {
+    i = Math.floor(Math.random() * dialogues.length);
+    attempts++;
+  }
+  used.push(i);
+  if (used.length > RECENT_SIZE) used.shift();
+  recent.set(key, used);
+  return dialogues[i];
+}
+
 export function getRandomDialogue(): string {
-  return dialogues[Math.floor(Math.random() * dialogues.length)];
+  return pickFreshDialogue('__shared');
 }
 
 export function getDialoguePair(): [string, string] {
-  const i = Math.floor(Math.random() * dialogues.length);
-  let j = Math.floor(Math.random() * dialogues.length);
-  while (j === i) j = Math.floor(Math.random() * dialogues.length);
-  return [dialogues[i], dialogues[j]];
+  return [pickFreshDialogue('__pair_a'), pickFreshDialogue('__pair_b')];
 }
 
 const narrationTemplates: Record<string, string[]> = {
