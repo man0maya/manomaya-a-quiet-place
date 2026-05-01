@@ -46,6 +46,10 @@ const Mayaworld = () => {
   const [timeOfDay, setTimeOfDay] = useState('morning');
   const [showModePrompt, setShowModePrompt] = useState(false);
   const [observeTimer, setObserveTimer] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [worldSeed, setWorldSeed] = useState<number | null>(null);
+  const [ribbon, setRibbon] = useState<{ text: string; ts: number }[]>([]);
+  const [farewell, setFarewell] = useState<string>('The world dissolves.');
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sessionRef = useRef<Session | null>(null);
