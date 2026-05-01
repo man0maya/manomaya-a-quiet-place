@@ -523,8 +523,8 @@ const Mayaworld = () => {
 
   if (phase === 'fading') {
     return (
-      <div className="fixed inset-0 bg-black z-50 flex items-center justify-center animate-fade-in">
-        <p className="font-serif text-[hsl(var(--foreground))]/15 text-sm italic">The world dissolves.</p>
+      <div className="fixed inset-0 bg-black z-50 flex items-center justify-center animate-fade-in px-6 text-center">
+        <p className="font-serif text-[hsl(var(--foreground))]/85 text-base italic">{farewell}</p>
       </div>
     );
   }
