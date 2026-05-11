@@ -474,176 +474,327 @@ function drawTile(ctx: CanvasRenderingContext2D, type: string, sx: number, sy: n
   ctx.strokeRect(sx, sy, T, T);
 }
 
-// === RICH CHARACTER SPRITES ===
+// === SAGE PROP MAP (signature object per sage, by index) ===
+const SAGE_PROPS: Array<'staff' | 'scroll' | 'bowl' | 'lotus' | 'beads' | 'flame' | 'crystal' | 'fan' | 'gourd'> = [
+  'flame',   // Bhrigu (fiery)
+  'fan',     // Pulastya (social wanderer)
+  'lotus',   // Pulaha (gentle)
+  'staff',   // Kratu (resolute mover)
+  'crystal', // Angiras (luminous)
+  'beads',   // Marichi (silent)
+  'bowl',    // Atri (healer)
+  'scroll',  // Vashistha (teacher)
+  'gourd',   // Daksha (organizer)
+];
+
+// === REFINED CHARACTER SPRITES — taller silhouette, hood, signature prop ===
 function drawSage(ctx: CanvasRenderingContext2D, sage: Sage, sx: number, sy: number, animFrame: number, isBound: boolean, sageIndex: number) {
   const isWalking = sage.state === 'walking';
   const isMeditating = sage.state === 'meditating';
   const isResting = sage.state === 'resting';
   const dir = getSageDirection(sage);
 
-  const walkCycle = Math.floor(animFrame * 0.12 + sageIndex * 1.3) % 4;
-  const bob = isWalking ? (walkCycle % 2 === 0 ? -1 : 0) : (isMeditating ? Math.sin(animFrame * 0.04 + sageIndex) * 0.5 : 0);
+  const walkCycle = Math.floor(animFrame * 0.14 + sageIndex * 1.3) % 4;
+  const stepBob = isWalking ? (walkCycle % 2 === 0 ? -1 : 0) : 0;
+  const idleBob = !isWalking && !isResting ? Math.sin(animFrame * 0.035 + sageIndex) * 0.6 : 0;
+  const bob = stepBob + idleBob;
 
   const bx = sx;
   const by = sy + bob;
 
-  // Shadow on ground
-  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  const robe = getSageRobeColor(sage.name);
+  const robeDark = darkenColor(robe, 0.7);
+  const robeLight = lightenColor(robe, 1.18);
+  const accent = sage.color;
+
+  // === Soft elliptical contact shadow ===
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
   ctx.beginPath();
-  ctx.ellipse(bx, by + 6, 4, 1.5, 0, 0, Math.PI * 2);
+  ctx.ellipse(bx, by + 9, 5, 1.6, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Aura glow
-  const auraAlpha = isBound ? 0.25 : (isMeditating ? 0.15 : 0.05);
-  const auraRadius = isBound ? 14 : (isMeditating ? 12 : 7);
-  const grad = ctx.createRadialGradient(bx, by, 0, bx, by, auraRadius);
-  grad.addColorStop(0, `rgba(${hexToRgb(sage.color)},${auraAlpha})`);
-  grad.addColorStop(1, `rgba(${hexToRgb(sage.color)},0)`);
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.arc(bx, by, auraRadius, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Meditation circles
-  if (isMeditating) {
-    const mRing = Math.sin(animFrame * 0.03) * 2 + 10;
-    const mAlpha = 0.08 + Math.sin(animFrame * 0.04 + sageIndex) * 0.05;
-    ctx.strokeStyle = `rgba(255, 255, 200, ${mAlpha})`;
-    ctx.lineWidth = 0.5;
+  // === Aura glow (subtle, accent color) ===
+  if (isBound || isMeditating) {
+    const auraAlpha = isBound ? 0.22 : 0.13;
+    const auraRadius = isBound ? 16 : 13;
+    const grad = ctx.createRadialGradient(bx, by - 2, 0, bx, by - 2, auraRadius);
+    grad.addColorStop(0, `rgba(${hexToRgb(accent)},${auraAlpha})`);
+    grad.addColorStop(1, `rgba(${hexToRgb(accent)},0)`);
+    ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(bx, by, mRing, 0, Math.PI * 2);
+    ctx.arc(bx, by - 2, auraRadius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Meditation ripple
+  if (isMeditating) {
+    const mRing = (animFrame * 0.4 + sageIndex * 20) % 18 + 6;
+    const mAlpha = Math.max(0, 0.18 - mRing * 0.008);
+    ctx.strokeStyle = `rgba(${hexToRgb(accent)}, ${mAlpha})`;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.arc(bx, by + 4, mRing, 0, Math.PI * 2);
     ctx.stroke();
   }
 
-  const robeColor = getSageRobeColor(sage.name);
-
-  // === BODY (direction-based) ===
   if (isResting) {
-    // Lying down / sitting pose
-    ctx.fillStyle = robeColor;
-    ctx.fillRect(bx - 4, by, 8, 3);
-    ctx.fillStyle = '#E8D0B0';
+    // Sitting pose — compact rounded form
+    ctx.fillStyle = robeDark;
     ctx.beginPath();
-    ctx.arc(bx - 3, by, 2.5, 0, Math.PI * 2);
+    ctx.ellipse(bx, by + 4, 5, 3.2, 0, 0, Math.PI * 2);
     ctx.fill();
-    // Zzz
-    const zAlpha = Math.sin(animFrame * 0.06) * 0.3 + 0.4;
-    ctx.font = '5px monospace';
-    ctx.fillStyle = `rgba(200, 220, 255, ${zAlpha})`;
-    ctx.fillText('z', bx + 4, by - 2);
-    ctx.fillText('z', bx + 6, by - 5);
-  } else {
-    // Feet (walking animation)
-    if (isWalking) {
-      ctx.fillStyle = '#3A2A1A';
-      const footOffset = walkCycle < 2 ? 1 : -1;
-      if (dir === 'left' || dir === 'right') {
-        ctx.fillRect(bx - 1 + footOffset, by + 4, 2, 1);
-      } else {
-        ctx.fillRect(bx - 2, by + 4 + (walkCycle % 2), 1, 1);
-        ctx.fillRect(bx + 1, by + 4 - (walkCycle % 2), 1, 1);
-      }
-    }
-
-    // Robe / body
-    ctx.fillStyle = robeColor;
-    if (dir === 'down') {
-      ctx.fillRect(bx - 3, by - 1, 6, 5);
-      // Robe fold
-      ctx.fillStyle = darkenColor(robeColor, 0.85);
-      ctx.fillRect(bx - 1, by + 1, 1, 3);
-    } else if (dir === 'up') {
-      ctx.fillRect(bx - 3, by - 1, 6, 5);
-      ctx.fillStyle = darkenColor(robeColor, 0.9);
-      ctx.fillRect(bx - 2, by, 4, 3);
-    } else {
-      // Side view - slightly narrower
-      const flipX = dir === 'left' ? -1 : 1;
-      ctx.fillRect(bx - 2 * flipX - 1, by - 1, 5, 5);
-      // Arm
-      ctx.fillStyle = darkenColor(robeColor, 0.85);
-      const armSwing = isWalking ? Math.sin(animFrame * 0.15 + sageIndex) * 1 : 0;
-      ctx.fillRect(bx + 2 * flipX, by + armSwing, 1, 3);
-    }
-
+    ctx.fillStyle = robe;
+    ctx.fillRect(bx - 4, by - 1, 8, 5);
     // Head
     ctx.fillStyle = '#E8D0B0';
     ctx.beginPath();
-    ctx.arc(bx, by - 3, 2.8, 0, Math.PI * 2);
+    ctx.arc(bx, by - 3, 2.6, 0, Math.PI * 2);
     ctx.fill();
-
-    // Hair/headwear accent
-    ctx.fillStyle = darkenColor(sage.color, 0.7);
-    if (dir === 'down') {
-      ctx.fillRect(bx - 2, by - 5, 4, 1);
-    } else if (dir === 'up') {
-      ctx.fillRect(bx - 2, by - 5, 4, 2);
-    } else {
-      const flipX = dir === 'left' ? -1 : 1;
-      ctx.fillRect(bx - 2, by - 5, 3, 1);
-    }
-
-    // Eyes (only facing down or side)
-    if (dir === 'down') {
-      ctx.fillStyle = '#2A1A0A';
-      ctx.fillRect(bx - 1, by - 3, 1, 1);
-      ctx.fillRect(bx + 1, by - 3, 1, 1);
-    } else if (dir === 'left' || dir === 'right') {
-      ctx.fillStyle = '#2A1A0A';
-      const ex = dir === 'left' ? bx - 1 : bx + 1;
-      ctx.fillRect(ex, by - 3, 1, 1);
-    }
-  }
-
-  // Name label
-  ctx.font = isBound ? 'bold 7px monospace' : '6px monospace';
-  ctx.fillStyle = isBound ? '#D4AF6A' : 'rgba(255,255,255,0.35)';
-  ctx.textAlign = 'center';
-  ctx.fillText(sage.name, bx, by - 9);
-
-  // Bound indicator
-  if (isBound) {
-    const indicAlpha = Math.sin(animFrame * 0.05) * 0.3 + 0.5;
-    ctx.fillStyle = `rgba(212, 175, 106, ${indicAlpha})`;
-    ctx.fillRect(bx - 1, by - 12, 2, 1);
-  }
-
-  // State icon
-  if (sage.state === 'conversing') {
-    ctx.font = '6px monospace';
-    ctx.fillStyle = 'rgba(200, 220, 255, 0.5)';
-    ctx.fillText('💬', bx + 5, by - 6);
-  }
-
-  // Dialogue bubble
-  if (sage.dialogue) {
-    const text = sage.dialogue.length > 30 ? sage.dialogue.slice(0, 28) + '…' : sage.dialogue;
-    ctx.font = '6px monospace';
-    const tw = ctx.measureText(text).width;
-    const pw = tw + 10;
-    const px = bx - pw / 2;
-    const py = by - 22;
-
-    // Bubble bg with pointer
-    ctx.fillStyle = 'rgba(8, 15, 25, 0.85)';
-    roundRect(ctx, px, py, pw, 12, 2);
-    ctx.fill();
-    // Pointer
+    // Hood
+    ctx.fillStyle = accent;
     ctx.beginPath();
-    ctx.moveTo(bx - 2, py + 12);
-    ctx.lineTo(bx, py + 15);
-    ctx.lineTo(bx + 2, py + 12);
+    ctx.arc(bx, by - 4, 3.2, Math.PI, 0);
     ctx.fill();
-    // Border
-    ctx.strokeStyle = `rgba(${hexToRgb(sage.color)}, 0.3)`;
-    ctx.lineWidth = 0.5;
-    roundRect(ctx, px, py, pw, 12, 2);
-    ctx.stroke();
-    // Text
-    ctx.fillStyle = '#E8D8C0';
-    ctx.textAlign = 'center';
-    ctx.fillText(text, bx, py + 8);
+    // Zzz
+    const zAlpha = Math.sin(animFrame * 0.06) * 0.25 + 0.45;
+    ctx.font = 'italic 6px serif';
+    ctx.fillStyle = `rgba(220, 230, 245, ${zAlpha})`;
+    ctx.textAlign = 'left';
+    ctx.fillText('z', bx + 5, by - 3);
+    ctx.fillText('z', bx + 7, by - 6);
+  } else {
+    // === Standing silhouette: feet → robe → torso → head → hood → prop ===
+
+    // Feet (small pixels)
+    ctx.fillStyle = '#2A1B0E';
+    if (isWalking) {
+      if (dir === 'left' || dir === 'right') {
+        const flipX = dir === 'left' ? -1 : 1;
+        const fo = walkCycle < 2 ? 1 : -1;
+        ctx.fillRect(bx - 1 + fo * flipX, by + 7, 2, 1);
+      } else {
+        ctx.fillRect(bx - 2, by + 7 + (walkCycle % 2 === 0 ? 0 : -1), 1, 1);
+        ctx.fillRect(bx + 1, by + 7 + (walkCycle % 2 === 0 ? -1 : 0), 1, 1);
+      }
+    } else {
+      ctx.fillRect(bx - 2, by + 7, 1, 1);
+      ctx.fillRect(bx + 1, by + 7, 1, 1);
+    }
+
+    // Lower robe (trapezoid via two rects)
+    ctx.fillStyle = robeDark;
+    ctx.fillRect(bx - 4, by + 4, 8, 3);
+    ctx.fillRect(bx - 3, by + 2, 6, 2);
+
+    // Mid robe / torso
+    ctx.fillStyle = robe;
+    ctx.fillRect(bx - 3, by - 2, 6, 4);
+
+    // Robe sash (accent stripe)
+    ctx.fillStyle = accent;
+    ctx.fillRect(bx - 3, by + 1, 6, 1);
+
+    // Robe fold highlight
+    ctx.fillStyle = robeLight;
+    if (dir === 'down') ctx.fillRect(bx - 1, by - 1, 1, 5);
+    else if (dir === 'left') ctx.fillRect(bx - 3, by - 1, 1, 5);
+    else if (dir === 'right') ctx.fillRect(bx + 2, by - 1, 1, 5);
+
+    // Arms — draped sleeves
+    ctx.fillStyle = robeDark;
+    const armSwing = isWalking ? Math.sin(animFrame * 0.18 + sageIndex) * 1 : 0;
+    if (dir === 'left' || dir === 'right') {
+      const flipX = dir === 'left' ? -1 : 1;
+      ctx.fillRect(bx + 2 * flipX, by + armSwing, 1, 3);
+    } else {
+      ctx.fillRect(bx - 4, by + (armSwing | 0), 1, 3);
+      ctx.fillRect(bx + 3, by - (armSwing | 0), 1, 3);
+    }
+
+    // Head (skin)
+    ctx.fillStyle = '#E8CFA8';
+    ctx.beginPath();
+    ctx.arc(bx, by - 4, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Hood (dome over head, in accent color)
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(bx, by - 5, 3.2, Math.PI, 0);
+    ctx.fill();
+    // Hood shadow line
+    ctx.fillStyle = darkenColor(accent, 0.6);
+    ctx.fillRect(bx - 3, by - 5, 6, 1);
+
+    // Eyes
+    ctx.fillStyle = '#1A1208';
+    if (dir === 'down') {
+      ctx.fillRect(bx - 1, by - 4, 1, 1);
+      ctx.fillRect(bx + 1, by - 4, 1, 1);
+    } else if (dir === 'left') {
+      ctx.fillRect(bx - 1, by - 4, 1, 1);
+    } else if (dir === 'right') {
+      ctx.fillRect(bx + 1, by - 4, 1, 1);
+    }
+
+    // Signature prop — held in hand
+    drawSageProp(ctx, SAGE_PROPS[sageIndex % SAGE_PROPS.length], bx, by, dir, accent, animFrame);
   }
+
+  // === Name label (cleaner serif, soft glow) ===
+  const labelY = by - 13;
+  ctx.font = isBound ? 'bold 8px "Cormorant Garamond", serif' : '7px "Cormorant Garamond", serif';
+  ctx.textAlign = 'center';
+  // shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillText(sage.name, bx + 0.5, labelY + 0.5);
+  ctx.fillStyle = isBound ? '#F0D894' : 'rgba(245, 242, 236, 0.78)';
+  ctx.fillText(sage.name, bx, labelY);
+
+  // Bound marker — small gold diamond above
+  if (isBound) {
+    const indicAlpha = Math.sin(animFrame * 0.05) * 0.3 + 0.65;
+    ctx.fillStyle = `rgba(212, 175, 106, ${indicAlpha})`;
+    ctx.beginPath();
+    ctx.moveTo(bx, by - 19);
+    ctx.lineTo(bx + 2, by - 17);
+    ctx.lineTo(bx, by - 15);
+    ctx.lineTo(bx - 2, by - 17);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // === Refined dialogue bubble — rounded serif card with tail ===
+  if (sage.dialogue) {
+    const raw = sage.dialogue;
+    const max = 36;
+    const text = raw.length > max ? raw.slice(0, max - 1) + '…' : raw;
+    ctx.font = 'italic 8px "Cormorant Garamond", serif';
+    const tw = ctx.measureText(text).width;
+    const pw = Math.max(tw + 12, 36);
+    const ph = 14;
+    const px = bx - pw / 2;
+    const py = by - 30;
+
+    // Soft drop shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    roundRect(ctx, px + 1, py + 1.5, pw, ph, 4);
+    ctx.fill();
+
+    // Bubble bg — off-white parchment
+    ctx.fillStyle = 'rgba(245, 242, 236, 0.96)';
+    roundRect(ctx, px, py, pw, ph, 4);
+    ctx.fill();
+
+    // Accent left border
+    ctx.fillStyle = `rgba(${hexToRgb(accent)}, 0.85)`;
+    ctx.fillRect(px, py + 2, 1.5, ph - 4);
+
+    // Tail (triangle pointing to head)
+    ctx.fillStyle = 'rgba(245, 242, 236, 0.96)';
+    ctx.beginPath();
+    ctx.moveTo(bx - 2.5, py + ph);
+    ctx.lineTo(bx, py + ph + 3);
+    ctx.lineTo(bx + 2.5, py + ph);
+    ctx.closePath();
+    ctx.fill();
+
+    // Text
+    ctx.fillStyle = '#1F2A2A';
+    ctx.textAlign = 'center';
+    ctx.fillText(text, bx, py + 9.5);
+  }
+}
+
+// Draw the signature prop a sage carries — keeps each character distinct
+function drawSageProp(
+  ctx: CanvasRenderingContext2D,
+  prop: 'staff' | 'scroll' | 'bowl' | 'lotus' | 'beads' | 'flame' | 'crystal' | 'fan' | 'gourd',
+  bx: number, by: number, dir: Direction, accent: string, animFrame: number
+) {
+  const side = dir === 'left' ? -1 : 1;
+  const handX = bx + (dir === 'down' || dir === 'up' ? -4 : 3 * side);
+  const handY = by + 1;
+
+  switch (prop) {
+    case 'staff': {
+      ctx.fillStyle = '#6B4A28';
+      ctx.fillRect(handX, by - 6, 1, 12);
+      ctx.fillStyle = accent;
+      ctx.fillRect(handX - 1, by - 7, 3, 1);
+      break;
+    }
+    case 'scroll': {
+      ctx.fillStyle = '#E8D8B0';
+      ctx.fillRect(handX, handY - 1, 3, 2);
+      ctx.fillStyle = '#8B6B3A';
+      ctx.fillRect(handX, handY - 1, 1, 2);
+      ctx.fillRect(handX + 2, handY - 1, 1, 2);
+      break;
+    }
+    case 'bowl': {
+      ctx.fillStyle = '#7A5230';
+      ctx.fillRect(handX - 1, handY, 4, 1);
+      ctx.fillStyle = `rgba(${hexToRgb(accent)}, 0.7)`;
+      ctx.fillRect(handX, handY - 1, 2, 1);
+      break;
+    }
+    case 'lotus': {
+      ctx.fillStyle = '#F0B0C8';
+      ctx.fillRect(handX, handY - 1, 2, 1);
+      ctx.fillStyle = '#E090B8';
+      ctx.fillRect(handX, handY, 2, 1);
+      ctx.fillStyle = '#FFE070';
+      ctx.fillRect(handX + 0.5, handY - 0.5, 1, 1);
+      break;
+    }
+    case 'beads': {
+      ctx.fillStyle = accent;
+      ctx.fillRect(handX, handY, 1, 1);
+      ctx.fillRect(handX + 1, handY + 1, 1, 1);
+      ctx.fillRect(handX, handY + 2, 1, 1);
+      ctx.fillStyle = darkenColor(accent, 0.6);
+      ctx.fillRect(handX - 1, handY + 1, 1, 1);
+      break;
+    }
+    case 'flame': {
+      const flick = (animFrame % 12) < 6 ? 0 : 1;
+      ctx.fillStyle = '#FFB040';
+      ctx.fillRect(handX, by - 4 - flick, 1, 2);
+      ctx.fillStyle = '#FFE090';
+      ctx.fillRect(handX, by - 5 - flick, 1, 1);
+      ctx.fillStyle = '#7A4A20';
+      ctx.fillRect(handX, by - 2, 1, 4);
+      break;
+    }
+    case 'crystal': {
+      ctx.fillStyle = `rgba(${hexToRgb(accent)}, 0.95)`;
+      ctx.fillRect(handX, handY - 1, 1, 3);
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.fillRect(handX, handY - 1, 1, 1);
+      break;
+    }
+    case 'fan': {
+      ctx.fillStyle = accent;
+      ctx.fillRect(handX, handY - 1, 3, 1);
+      ctx.fillRect(handX + 1, handY - 2, 1, 1);
+      break;
+    }
+    case 'gourd': {
+      ctx.fillStyle = '#A87838';
+      ctx.fillRect(handX, handY, 2, 2);
+      ctx.fillStyle = '#7A5828';
+      ctx.fillRect(handX, handY - 1, 1, 1);
+      break;
+    }
+  }
+}
+
+function lightenColor(hex: string, factor: number): string {
+  const r = Math.min(255, Math.floor(parseInt(hex.slice(1, 3), 16) * factor));
+  const g = Math.min(255, Math.floor(parseInt(hex.slice(3, 5), 16) * factor));
+  const b = Math.min(255, Math.floor(parseInt(hex.slice(5, 7), 16) * factor));
+  return `rgb(${r},${g},${b})`;
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
