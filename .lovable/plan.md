@@ -1,106 +1,81 @@
-## Mayaworld v2 — 3-Phase Enhancement Plan
+## Mayaworld Visual & Life Upgrade — 3-Phase Plan
 
-Goal: a living, ever-changing world with crisp, readable dialogue, that only awakens when a viewer is present. **Zero AI tokens** — everything procedural in code.
+`isomiddleearth` is a tile-paint tool built around pre-rendered isometric PNG sprites (128×64 tile footprint, 130×230 character sprites) grouped into "realms" (Shire, Gondor, Rohan, Lothlórien, Rivendell, Moria, Mordor) with grouped tile categories (Terrain, Water & Bridges, Trees, Dwellings, Buildings, Decorations).
 
----
+We will not copy its assets (license/branding belongs to that project and its theme is Tolkien). Instead we adopt its **structural ideas**: an isometric projection, realm-style cohesive palettes, layered sprite categories, and a clean toolbar-driven UI. Mayaworld remains a *living simulation* (not a paint tool), so we keep our sage agents, dialogue, and seasons.
 
-### Phase 1 — Readable Dialogue + Viewer-Gated World
-
-**1A. Dialogue legibility (the hardest blocker right now)**
-Today every dialogue/narration uses `text-[hsl(var(--foreground))]/30–35` over a half-transparent black panel — that's why it looks blurry/washed.
-
-Changes in `src/pages/Mayaworld.tsx`:
-- Narration panel (observe mode), interaction dialog (sage panel), action menu, feedback toasts, mode prompt:
-  - Solid backdrop: `bg-black/85` with `backdrop-blur-md`
-  - Border: `border-[hsl(var(--primary))]/30` (was `/8–/12`)
-  - Body text: `text-[hsl(var(--foreground))]/90` (was `/30`), `font-serif`, `text-[15px]`, `leading-relaxed`, `tracking-normal` (remove the wide letter-spacing)
-  - Sage name: `text-[hsl(var(--primary))]` full opacity, `text-sm`
-  - Drop the italic on long narration (italic + low opacity = unreadable on small screens)
-  - Add `text-shadow: 0 1px 2px rgba(0,0,0,0.8)` via inline style for any text overlaid on canvas
-- Mobile: ensure panels use `text-base` (16px) min, with `px-5 py-4` padding
-- Action buttons: `text-[hsl(var(--foreground))]/85` resting, `text-[hsl(var(--primary))]` hover, border `/30`
-
-**1B. Viewer-presence gate (world dormant when nobody's watching)**
-Right now `startSession` runs the world tick the moment the user enters a code. Change to: the simulation only ticks while the tab is focused and visible.
-
-In `src/mayaworld/sessionController.ts`:
-- Add `isPaused` flag on Session
-- Tick loop checks `if (session.isPaused) return;` before advancing time/sage AI
-- Expose `pauseSession(session)` / `resumeSession(session)`
-
-In `src/pages/Mayaworld.tsx`:
-- `document.visibilitychange` listener → pause when hidden, resume when visible
-- `window.blur` / `focus` listeners as backup
-- Show a soft "✦ The world rests until you return" overlay when paused
-- Render loop continues (so canvas stays painted) but world state is frozen
-
-This satisfies "world will only start when someone logs in to watch."
+### Goals
+- Cleaner, more readable world (isometric, less visual noise)
+- Cleaner character design (consistent silhouettes, distinct sages)
+- More "life" (richer ambient behaviors, props, sound of presence)
+- Keep zero-AI-token runtime
 
 ---
 
-### Phase 2 — Ever-Changing World (procedural variety, no AI)
+### Phase 1 — Cleaner UI shell & character redesign (top-down, low risk)
 
-**2A. Per-session biome layout**
-`worldGenerator.ts` currently uses a fixed top-to-bottom band layout (Mountain → Vashistha → Daksha → Village → Garden → Groves → Beach). Every world looks the same shape.
+Stay top-down for one phase to ship a visible win fast while phase 2 prepares the iso renderer.
 
-Replace with a **biome zone shuffler**:
-- Define 8 biome archetypes: `mountain_realm`, `silent_forest`, `flower_plains`, `sage_village`, `lake_basin`, `garden_terraces`, `groves_of_light`, `beach_ruins`
-- Each session picks a random rotation (0/90/180/270°) + horizontal mirror
-- Voronoi-style region assignment using 6–9 random seed points, each claiming nearest tiles → biomes can appear in *any* corner
-- Major features (temple, cave, ruins, lake) are placed inside whichever biome region matches them, not at hard-coded coordinates
+- Redesign sage sprites in `renderer.ts`:
+  - 16×24 character footprint, 4-direction walk, 2-frame idle bob
+  - Strong silhouette: hood + robe + staff/bowl/scroll prop per sage
+  - Palette restricted to project tokens (teal/gold/off-white) plus one signature accent per sage
+  - Soft contact shadow ellipse
+- HUD/UI cleanup in `Mayaworld.tsx`:
+  - Single bottom dock (sage list, time-of-day, weather, world #) replacing scattered chips
+  - Dialogue bubble: rounded card, serif, drop-shadow, tail pointing to sage; max 2 lines, fade in/out
+  - Memory ribbon collapsed into a small "scroll" toggle
+  - Pause/rest overlay refined with a centered seal mark
+- Color & contrast pass via `index.css` tokens only (no hardcoded colors)
 
-**2B. Dynamic structure variety**
-- Randomize structure counts each session: 1 temple (always), 2–5 shrines, 1–2 caves, 1–3 ruin clusters, 0–2 extra hut clusters
-- Random rotations for structure shapes (so the temple isn't always the same 5×4)
-- Add 3 new tile types: `bamboo`, `pond`, `bonfire` (with renderer entries) for additional variety
-
-**2C. Visible world evolution during a session**
-World currently feels stagnant because nothing changes mid-session. Add:
-- **Drifting weather** — weather changes more often (every 2–4 min vs current 2–6+), with smooth transitions (`mist → light_rain → rain → clear`)
-- **Day/night** is already there but make it visually obvious — apply a global tint pass in `renderer.ts` (warm dawn, neutral day, golden evening, deep blue night with star dots)
-- **Ephemeral events** every 60–120s, randomly: a flower bloom radius spreads briefly, fireflies appear in a grove, a rainbow over the lake after rain, a meteor at night, leaves drift across the screen on wind
-- **Tile decay/regrowth** — `flower` tiles can wilt to `grass` and regrow; `tall_grass` cycles; gives micro-changes every ~30s
-
-**2D. Re-seed on entry**
-Each entry-code session generates a brand new seed (already does via `Math.random()`), but ensure the seed is logged on screen as a tiny "world #XXXX" tag so users can *see* it's different each time.
+Deliverable: same simulation, dramatically cleaner read.
 
 ---
 
-### Phase 3 — Polish & Re-engagement
+### Phase 2 — Isometric world renderer (the iso-middle-earth inspiration)
 
-**3A. Sage behavior diversity**
-- Add 6 new sage activities to `dialogueBank.ts` and `agentEngine.ts`: `gardening`, `chanting`, `gathering`, `teaching` (pairs with another sage), `wandering_far`, `stargazing` (night only)
-- Sage states pick activity based on personality + tile + time of day so each session feels different
-- Two-sage interactions: occasionally two sages meet and exchange a dialogue line (visible bubble between them)
+Convert the world view from orthographic top-down to true 2:1 isometric, pre-baked sprite tiles drawn in our own art style.
 
-**3B. Dialogue bank expansion (still no AI)**
-- Grow `dialogues[]` from 30 → 120 lines, organized by `temperament` so each sage has its own voice
-- Add weather + time + biome combo lines (e.g. `night_grove`, `rain_temple`)
-- Avoid repetition: track last 10 lines per sage, never repeat
+- New `src/mayaworld/iso/` module:
+  - `projection.ts`: `gridToScreen(x,y,z)`, `screenToGrid()`, painter's-order sort
+  - `tileAtlas.ts`: procedural canvas atlas generated once at boot — for each tile type (grass, sand, water, stone, forest, hut, temple, bridge, flower, mountain, shrine, ruins, garden, village) we pre-render a 64×32 diamond top + side walls into an offscreen canvas. No external assets.
+  - `characterAtlas.ts`: pre-render each sage's 4-dir × 2-frame sprites (32×48) once
+  - `renderIso.ts`: replaces the per-tile draw loop with atlas blits in painter order; supports z-height for huts/trees/mountains
+- Camera: smooth follow on focused sage, edge-pan on hover, pinch/wheel zoom (1×–2×)
+- Hover preview: subtle outline diamond on tile under cursor (mirrors iso-middle-earth feel)
+- Keep `worldGenerator.ts` outputs unchanged (tile grid is the same data) — only rendering changes
 
-**3C. World memory ribbon**
-A tiny scrolling ticker at the bottom-left logs ambient events:
-> "Pulastya reached the garden · Mist gathers over the lake · Marichi began to chant"
-Updates every ~10s, max 3 lines visible, `text-[hsl(var(--foreground))]/70` for full readability.
-
-**3D. Re-entry hint**
-On `leave`, show: *"World #1847 dissolves. The next will be different."* — reinforces the ever-changing promise.
+Deliverable: top-down → clean isometric view with the same seeded worlds.
 
 ---
 
-### Files Touched
+### Phase 3 — More life: realms, props, and ambient behaviors
 
-```text
-src/mayaworld/constants.ts       — new tiles, new biome archetypes, expanded items
-src/mayaworld/worldGenerator.ts  — voronoi biome layout, rotation/mirror, dynamic structures
-src/mayaworld/renderer.ts        — new tile drawings, day/night tint pass, ephemeral effects layer
-src/mayaworld/agentEngine.ts     — new activities, two-sage interactions
-src/mayaworld/sessionController.ts — pause/resume, visibility gating
-src/mayaworld/dialogueBank.ts    — 4× more lines, no-repeat tracking, biome+weather combos
-src/pages/Mayaworld.tsx          — visibility listener, dormant overlay, readable text styles, world # tag, memory ribbon
-```
+- "Realms" inspired by iso-middle-earth realm grouping, mapped to our spiritual themes:
+  - Grove (forest+flower), Sanctum (temple+shrine+stone_path), Hamlet (hut+village+garden), Highlands (mountain+stone), Shore (beach+water+bridge), Wilds (tall_grass+ruins+cave)
+  - Each realm has its own palette overlay + ambient particles (petals in Grove, incense in Sanctum, hearth smoke in Hamlet, mist in Highlands, gulls in Shore, fireflies in Wilds)
+- Decorative prop layer (no gameplay impact): lanterns along stone_path at night, prayer flags on bridges, water-lilies on lakes, drying laundry near huts, stacked stones near shrines. Procedurally seeded per world.
+- Sage life upgrades:
+  - Daily "intentions" picked at dawn (visit shrine, gather flower, sit by water) drive their pathing
+  - Two sages can meet at landmarks for short conversations (already partially in dialogue bank)
+  - Subtle footstep dust + ripples in water when crossing bridges
+- Optional ambient audio toggle (off by default, respects "no autoplay motion" memory only when user opts in)
 
-### Non-goals / constraints respected
-- No AI / Lovable AI calls anywhere — purely seeded procedural code
-- No new dependencies, no new DB tables (Mayaworld remains ephemeral per project memory)
-- Existing access-code entry, karma, moments, inventory all preserved
+Deliverable: each launch *feels* like a different realm with its own mood, while sages visibly pursue tiny intentions.
+
+---
+
+### Technical notes
+
+- Atlases are generated in-memory at session start (no network, no AI tokens, no shipped binaries).
+- Iso conversion is rendering-only; `world.tiles[][]` schema and `Sage` interface stay intact, so `agentEngine.ts`, `sessionController.ts`, `dialogueBank.ts`, and the visibility-pause logic continue to work.
+- All colors via `hsl(var(--…))` tokens defined in `index.css`; new realm overlays added as token variants.
+- No assets copied from `isomiddleearth`; only the *idea* of isometric tile + character composition and realm-grouped palettes.
+
+### Out of scope
+- Multiplayer / shared worlds
+- A tile editor UI for users
+- 3D / WebGL — staying on 2D canvas for performance and aesthetic consistency
+
+### Suggested order of approval
+Approve Phase 1 first (fast visible win). Phase 2 is the largest change. Phase 3 layers on once iso is stable.
