@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ACCESS_CODES, TILE_SIZE, SAGE_DEFINITIONS, NARRATION_INTERVAL_MIN, NARRATION_INTERVAL_MAX, LEVEL_UNLOCKS, KARMA_THRESHOLDS } from "@/mayaworld/constants";
+import { ACCESS_CODES, SAGE_DEFINITIONS, NARRATION_INTERVAL_MIN, NARRATION_INTERVAL_MAX, LEVEL_UNLOCKS, KARMA_THRESHOLDS } from "@/mayaworld/constants";
 import { SimMode, World, SageAction, Moment, PlayerStats } from "@/mayaworld/types";
 import { createSession, startSession, stopSession, setMode, getNearestSage, getAvailableActions, executeAction, checkMoments, addKarma, pauseSession, resumeSession, getRibbon, Session } from "@/mayaworld/sessionController";
-import { renderWorld } from "@/mayaworld/renderer";
+import { renderWorldIso, renderIsoMinimap, screenToGrid, ISO_TILE_W, ISO_TILE_H, gridToScreen } from "@/mayaworld/renderer";
 import { getNarration, getMoodThought, getInteractionResponse, getActionNarration } from "@/mayaworld/dialogueBank";
 
 type Phase = 'entry' | 'clouds' | 'world' | 'fading';
@@ -57,6 +57,9 @@ const Mayaworld = () => {
   const rafRef = useRef<number>(0);
   const boundNameRef = useRef('');
   const cloudCanvasRef = useRef<HTMLCanvasElement>(null);
+  const zoomRef = useRef(2); // default zoom — adjusted by viewport
+  const [hudExpanded, setHudExpanded] = useState(false);
+  const [showMinimap, setShowMinimap] = useState(false);
 
   // Stagger poetic lines
   useEffect(() => {
@@ -249,7 +252,17 @@ const Mayaworld = () => {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const resize = () => {
+      const w = window.innerWidth, h = window.innerHeight;
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      // Pick default zoom by viewport: tighter on mobile so things feel close & readable
+      const auto = w < 600 ? 2.2 : w < 1024 ? 1.9 : 1.6;
+      zoomRef.current = auto;
+    };
     resize();
     window.addEventListener('resize', resize);
 
@@ -260,12 +273,16 @@ const Mayaworld = () => {
       const bound = session.world.sages.find(s => s.name === session.boundSageName);
       const camX = bound ? bound.x : session.world.width / 2;
       const camY = bound ? bound.y : session.world.height / 2;
-      renderWorld(ctx, session.world, { x: camX, y: camY }, canvas.width, canvas.height, session.boundSageName, animFrameRef.current);
+      // Total canvas → render scale combines DPR × user zoom
+      const totalZoom = dpr * zoomRef.current;
+      renderWorldIso(ctx, session.world, { x: camX, y: camY }, canvas.width, canvas.height, session.boundSageName, animFrameRef.current, totalZoom);
+      // Optional minimap (drawn at native canvas scale)
+      if (showMinimap) renderIsoMinimap(ctx, session.world, session.boundSageName, canvas.width, canvas.height, Math.min(140, canvas.width * 0.25));
       rafRef.current = requestAnimationFrame(draw);
     };
     rafRef.current = requestAnimationFrame(draw);
     return () => { window.removeEventListener('resize', resize); cancelAnimationFrame(rafRef.current); };
-  }, []);
+  }, [showMinimap]);
 
   const handleModeSelect = useCallback((selectedMode: SimMode) => {
     setModeState(selectedMode);
@@ -432,15 +449,63 @@ const Mayaworld = () => {
     else { clientX = e.clientX; clientY = e.clientY; }
     const bound = session.world.sages.find(s => s.name === session.boundSageName);
     if (!bound) return;
-    const offsetX = canvas.width / 2 - bound.x * TILE_SIZE;
-    const offsetY = canvas.height / 2 - bound.y * TILE_SIZE;
-    const dx = (clientX - offsetX) / TILE_SIZE - bound.x;
-    const dy = (clientY - offsetY) / TILE_SIZE - bound.y;
+    // Convert screen tap → iso grid using same projection used in renderer
+    const rect = canvas.getBoundingClientRect();
+    const cssW = rect.width, cssH = rect.height;
+    const z = zoomRef.current;
+    const vw = cssW / z, vh = cssH / z;
+    // Camera-centered iso origin in virtual (post-zoom) space
+    const camIso = gridToScreen(bound.x, bound.y);
+    const offX = vw / 2 - camIso.sx;
+    const offY = vh / 2 - camIso.sy;
+    const localX = (clientX - rect.left) / z - offX;
+    const localY = (clientY - rect.top) / z - offY - ISO_TILE_H / 2;
+    const { gx, gy } = screenToGrid(localX, localY);
+    const dx = gx - bound.x;
+    const dy = gy - bound.y;
     session.keysDown.clear();
     if (Math.abs(dx) > Math.abs(dy)) session.keysDown.add(dx > 0 ? 'ArrowRight' : 'ArrowLeft');
     else session.keysDown.add(dy > 0 ? 'ArrowDown' : 'ArrowUp');
     setTimeout(() => session.keysDown.clear(), 250);
   };
+
+  // Wheel + pinch zoom
+  useEffect(() => {
+    if (phase !== 'world') return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      zoomRef.current = Math.max(1, Math.min(4, zoomRef.current * factor));
+    };
+    let pinchStart = 0; let zoomStart = zoomRef.current;
+    const dist = (t: TouchList) => {
+      const dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY;
+      return Math.hypot(dx, dy);
+    };
+    const onTS = (e: TouchEvent) => {
+      if (e.touches.length === 2) { pinchStart = dist(e.touches); zoomStart = zoomRef.current; }
+    };
+    const onTM = (e: TouchEvent) => {
+      if (e.touches.length === 2 && pinchStart > 0) {
+        e.preventDefault();
+        const d = dist(e.touches);
+        zoomRef.current = Math.max(1, Math.min(4, zoomStart * (d / pinchStart)));
+      }
+    };
+    const onTE = () => { pinchStart = 0; };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    canvas.addEventListener('touchstart', onTS, { passive: true });
+    canvas.addEventListener('touchmove', onTM, { passive: false });
+    canvas.addEventListener('touchend', onTE);
+    return () => {
+      canvas.removeEventListener('wheel', onWheel);
+      canvas.removeEventListener('touchstart', onTS);
+      canvas.removeEventListener('touchmove', onTM);
+      canvas.removeEventListener('touchend', onTE);
+    };
+  }, [phase]);
 
   const getKarmaLabel = (karma: number): string => {
     if (karma >= KARMA_THRESHOLDS.luminous) return 'Luminous';
@@ -538,44 +603,41 @@ const Mayaworld = () => {
 
       {/* Main world canvas */}
       <canvas ref={canvasRef} className="block w-full h-full" onClick={handleCanvasTap} onTouchStart={handleCanvasTap}
-        style={{ opacity: phase === 'clouds' ? cloudProgress * cloudProgress : 1 }} />
+        style={{ opacity: phase === 'clouds' ? cloudProgress * cloudProgress : 1, imageRendering: 'pixelated' as const, touchAction: 'none' }} />
 
       {/* World UI */}
       {phase === 'world' && (
         <>
-          {/* Top-left HUD */}
-          <div className="absolute top-3 left-3 pointer-events-none">
-            <div className="bg-black/80 backdrop-blur-md border border-[hsl(var(--primary))]/30 rounded px-3 py-2 min-w-[150px] shadow-lg">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: SAGE_DEFINITIONS.find(s => s.name === boundNameRef.current)?.color || '#D4AF6A' }} />
-                <span className="text-[hsl(var(--primary))] text-[12px] font-mono tracking-wider font-semibold">
-                  {boundNameRef.current}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[hsl(var(--foreground))]/85 text-[11px] font-mono">
-                <span>{getTimeIcon(timeOfDay)}</span>
-                <span>{timeOfDay}</span>
-                <span className="text-[hsl(var(--foreground))]/40">|</span>
-                <span>{getWeatherIcon(weather)}</span>
-                <span>{weather}</span>
-              </div>
-              {stats && (
-                <div className="flex items-center gap-1.5 text-[11px] font-mono mt-1">
-                  <span className="text-[hsl(var(--primary))]">Lv.{stats.level}</span>
-                  <span className="text-[hsl(var(--foreground))]/40">|</span>
-                  <span className={`${stats.karma >= 50 ? 'text-green-400' : stats.karma < 0 ? 'text-red-400' : 'text-[hsl(var(--foreground))]/85'}`}>
-                    K:{stats.karma > 0 ? '+' : ''}{stats.karma}
-                  </span>
-                  <span className="text-[hsl(var(--foreground))]/40">|</span>
-                  <span className="text-[hsl(var(--foreground))]/85">{mode === 'observe' ? '👁 observe' : '✋ authority'}</span>
+          {/* Top-left HUD — collapsible compact chip */}
+          <div className="absolute top-3 left-3 z-30">
+            <button
+              onClick={() => setHudExpanded(v => !v)}
+              aria-label="Toggle status"
+              className="bg-black/80 backdrop-blur-md border border-[hsl(var(--primary))]/30 rounded-full pl-2 pr-3 py-1.5 shadow-lg flex items-center gap-2 hover:border-[hsl(var(--primary))]/60 transition-colors"
+            >
+              <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: SAGE_DEFINITIONS.find(s => s.name === boundNameRef.current)?.color || '#D4AF6A' }} />
+              <span className="text-[hsl(var(--primary))] text-[13px] font-serif tracking-wide">{boundNameRef.current}</span>
+              {stats && <span className="text-[hsl(var(--foreground))]/65 text-[11px] font-mono">Lv.{stats.level}</span>}
+            </button>
+            {hudExpanded && (
+              <div className="mt-2 bg-black/85 backdrop-blur-md border border-[hsl(var(--primary))]/30 rounded-lg px-3 py-2 shadow-lg min-w-[180px] space-y-1">
+                <div className="flex items-center gap-2 text-[hsl(var(--foreground))]/85 text-[12px] font-mono">
+                  <span>{getTimeIcon(timeOfDay)} {timeOfDay}</span>
+                  <span className="text-[hsl(var(--foreground))]/40">·</span>
+                  <span>{getWeatherIcon(weather)} {weather}</span>
                 </div>
-              )}
-              {worldSeed != null && (
-                <div className="text-[hsl(var(--foreground))]/55 text-[10px] font-mono mt-1 tracking-wider">
-                  ✦ World #{worldSeed}
-                </div>
-              )}
-            </div>
+                {stats && (
+                  <div className="flex items-center gap-2 text-[12px] font-mono">
+                    <span className={stats.karma >= 50 ? 'text-green-400' : stats.karma < 0 ? 'text-red-400' : 'text-[hsl(var(--foreground))]/85'}>K:{stats.karma > 0 ? '+' : ''}{stats.karma}</span>
+                    <span className="text-[hsl(var(--foreground))]/40">·</span>
+                    <span className="text-[hsl(var(--foreground))]/85">{mode === 'observe' ? '👁 observe' : '✋ authority'}</span>
+                  </div>
+                )}
+                {worldSeed != null && (
+                  <div className="text-[hsl(var(--foreground))]/55 text-[10px] font-mono tracking-wider">✦ World #{worldSeed}</div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Stats overlay */}
@@ -643,16 +705,25 @@ const Mayaworld = () => {
             </div>
           )}
 
-          {/* Top right controls */}
-          <div className="absolute top-3 right-3 flex gap-2 items-center">
+          {/* Top right controls — icon buttons, 40x40 touch targets */}
+          <div className="absolute top-3 right-3 flex gap-2 items-center z-30">
+            <button onClick={() => zoomRef.current = Math.min(4, zoomRef.current * 1.15)}
+              aria-label="Zoom in"
+              className="w-10 h-10 flex items-center justify-center text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] text-lg bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))] transition-colors">+</button>
+            <button onClick={() => zoomRef.current = Math.max(1, zoomRef.current / 1.15)}
+              aria-label="Zoom out"
+              className="w-10 h-10 flex items-center justify-center text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] text-lg bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))] transition-colors">−</button>
+            <button onClick={() => setShowMinimap(v => !v)}
+              aria-label="Toggle minimap"
+              className={`w-10 h-10 flex items-center justify-center text-base bg-black/80 backdrop-blur-md rounded-full border transition-colors ${showMinimap ? 'text-[hsl(var(--primary))] border-[hsl(var(--primary))]' : 'text-[hsl(var(--foreground))]/85 border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))]'}`}>◔</button>
             <button onClick={handleModeToggle}
-              className="text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] text-[11px] font-mono tracking-wider transition-colors bg-black/80 backdrop-blur-md px-3 py-1.5 rounded border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))]">
-              {mode === 'observe' ? 'take authority' : 'observe'}
+              aria-label={mode === 'observe' ? 'Take authority' : 'Observe'}
+              className="w-10 h-10 flex items-center justify-center text-base text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))] transition-colors">
+              {mode === 'observe' ? '✋' : '👁'}
             </button>
             <button onClick={handleExit}
-              className="text-[hsl(var(--foreground))]/85 hover:text-red-400 text-[11px] font-mono tracking-wider transition-colors bg-black/80 backdrop-blur-md px-3 py-1.5 rounded border border-[hsl(var(--primary))]/30 hover:border-red-400/60">
-              leave
-            </button>
+              aria-label="Leave"
+              className="w-10 h-10 flex items-center justify-center text-base text-[hsl(var(--foreground))]/85 hover:text-red-400 bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-red-400/60 transition-colors">↩</button>
           </div>
 
           {/* Ambient ribbon — what's happening in the world */}

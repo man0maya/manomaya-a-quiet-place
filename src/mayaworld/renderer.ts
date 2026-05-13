@@ -1,5 +1,7 @@
 import { World, Sage, DroppedItem, Weather, TimeOfDay } from './types';
 import { TILE_SIZE, TILE_COLORS, DAY_CYCLE_TICKS, SAGE_DEFINITIONS } from './constants';
+export { renderWorldIso, renderIsoMinimap } from './iso/renderIso';
+export { gridToScreen, screenToGrid, ISO_TILE_W, ISO_TILE_H } from './iso/projection';
 
 interface Camera {
   x: number;
