@@ -608,39 +608,36 @@ const Mayaworld = () => {
       {/* World UI */}
       {phase === 'world' && (
         <>
-          {/* Top-left HUD */}
-          <div className="absolute top-3 left-3 pointer-events-none">
-            <div className="bg-black/80 backdrop-blur-md border border-[hsl(var(--primary))]/30 rounded px-3 py-2 min-w-[150px] shadow-lg">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: SAGE_DEFINITIONS.find(s => s.name === boundNameRef.current)?.color || '#D4AF6A' }} />
-                <span className="text-[hsl(var(--primary))] text-[12px] font-mono tracking-wider font-semibold">
-                  {boundNameRef.current}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[hsl(var(--foreground))]/85 text-[11px] font-mono">
-                <span>{getTimeIcon(timeOfDay)}</span>
-                <span>{timeOfDay}</span>
-                <span className="text-[hsl(var(--foreground))]/40">|</span>
-                <span>{getWeatherIcon(weather)}</span>
-                <span>{weather}</span>
-              </div>
-              {stats && (
-                <div className="flex items-center gap-1.5 text-[11px] font-mono mt-1">
-                  <span className="text-[hsl(var(--primary))]">Lv.{stats.level}</span>
-                  <span className="text-[hsl(var(--foreground))]/40">|</span>
-                  <span className={`${stats.karma >= 50 ? 'text-green-400' : stats.karma < 0 ? 'text-red-400' : 'text-[hsl(var(--foreground))]/85'}`}>
-                    K:{stats.karma > 0 ? '+' : ''}{stats.karma}
-                  </span>
-                  <span className="text-[hsl(var(--foreground))]/40">|</span>
-                  <span className="text-[hsl(var(--foreground))]/85">{mode === 'observe' ? '👁 observe' : '✋ authority'}</span>
+          {/* Top-left HUD — collapsible compact chip */}
+          <div className="absolute top-3 left-3 z-30">
+            <button
+              onClick={() => setHudExpanded(v => !v)}
+              aria-label="Toggle status"
+              className="bg-black/80 backdrop-blur-md border border-[hsl(var(--primary))]/30 rounded-full pl-2 pr-3 py-1.5 shadow-lg flex items-center gap-2 hover:border-[hsl(var(--primary))]/60 transition-colors"
+            >
+              <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: SAGE_DEFINITIONS.find(s => s.name === boundNameRef.current)?.color || '#D4AF6A' }} />
+              <span className="text-[hsl(var(--primary))] text-[13px] font-serif tracking-wide">{boundNameRef.current}</span>
+              {stats && <span className="text-[hsl(var(--foreground))]/65 text-[11px] font-mono">Lv.{stats.level}</span>}
+            </button>
+            {hudExpanded && (
+              <div className="mt-2 bg-black/85 backdrop-blur-md border border-[hsl(var(--primary))]/30 rounded-lg px-3 py-2 shadow-lg min-w-[180px] space-y-1">
+                <div className="flex items-center gap-2 text-[hsl(var(--foreground))]/85 text-[12px] font-mono">
+                  <span>{getTimeIcon(timeOfDay)} {timeOfDay}</span>
+                  <span className="text-[hsl(var(--foreground))]/40">·</span>
+                  <span>{getWeatherIcon(weather)} {weather}</span>
                 </div>
-              )}
-              {worldSeed != null && (
-                <div className="text-[hsl(var(--foreground))]/55 text-[10px] font-mono mt-1 tracking-wider">
-                  ✦ World #{worldSeed}
-                </div>
-              )}
-            </div>
+                {stats && (
+                  <div className="flex items-center gap-2 text-[12px] font-mono">
+                    <span className={stats.karma >= 50 ? 'text-green-400' : stats.karma < 0 ? 'text-red-400' : 'text-[hsl(var(--foreground))]/85'}>K:{stats.karma > 0 ? '+' : ''}{stats.karma}</span>
+                    <span className="text-[hsl(var(--foreground))]/40">·</span>
+                    <span className="text-[hsl(var(--foreground))]/85">{mode === 'observe' ? '👁 observe' : '✋ authority'}</span>
+                  </div>
+                )}
+                {worldSeed != null && (
+                  <div className="text-[hsl(var(--foreground))]/55 text-[10px] font-mono tracking-wider">✦ World #{worldSeed}</div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Stats overlay */}
