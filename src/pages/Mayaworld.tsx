@@ -603,7 +603,7 @@ const Mayaworld = () => {
 
       {/* Main world canvas */}
       <canvas ref={canvasRef} className="block w-full h-full" onClick={handleCanvasTap} onTouchStart={handleCanvasTap}
-        style={{ opacity: phase === 'clouds' ? cloudProgress * cloudProgress : 1 }} />
+        style={{ opacity: phase === 'clouds' ? cloudProgress * cloudProgress : 1, imageRendering: 'pixelated' as const, touchAction: 'none' }} />
 
       {/* World UI */}
       {phase === 'world' && (
