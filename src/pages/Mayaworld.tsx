@@ -252,7 +252,17 @@ const Mayaworld = () => {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const resize = () => {
+      const w = window.innerWidth, h = window.innerHeight;
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      // Pick default zoom by viewport: tighter on mobile so things feel close & readable
+      const auto = w < 600 ? 2.2 : w < 1024 ? 1.9 : 1.6;
+      zoomRef.current = auto;
+    };
     resize();
     window.addEventListener('resize', resize);
 
@@ -263,12 +273,16 @@ const Mayaworld = () => {
       const bound = session.world.sages.find(s => s.name === session.boundSageName);
       const camX = bound ? bound.x : session.world.width / 2;
       const camY = bound ? bound.y : session.world.height / 2;
-      renderWorld(ctx, session.world, { x: camX, y: camY }, canvas.width, canvas.height, session.boundSageName, animFrameRef.current);
+      // Total canvas → render scale combines DPR × user zoom
+      const totalZoom = dpr * zoomRef.current;
+      renderWorldIso(ctx, session.world, { x: camX, y: camY }, canvas.width, canvas.height, session.boundSageName, animFrameRef.current, totalZoom);
+      // Optional minimap (drawn at native canvas scale)
+      if (showMinimap) renderIsoMinimap(ctx, session.world, session.boundSageName, canvas.width, canvas.height, Math.min(140, canvas.width * 0.25));
       rafRef.current = requestAnimationFrame(draw);
     };
     rafRef.current = requestAnimationFrame(draw);
     return () => { window.removeEventListener('resize', resize); cancelAnimationFrame(rafRef.current); };
-  }, []);
+  }, [showMinimap]);
 
   const handleModeSelect = useCallback((selectedMode: SimMode) => {
     setModeState(selectedMode);
