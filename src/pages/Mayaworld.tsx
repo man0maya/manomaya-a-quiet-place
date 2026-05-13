@@ -449,15 +449,63 @@ const Mayaworld = () => {
     else { clientX = e.clientX; clientY = e.clientY; }
     const bound = session.world.sages.find(s => s.name === session.boundSageName);
     if (!bound) return;
-    const offsetX = canvas.width / 2 - bound.x * TILE_SIZE;
-    const offsetY = canvas.height / 2 - bound.y * TILE_SIZE;
-    const dx = (clientX - offsetX) / TILE_SIZE - bound.x;
-    const dy = (clientY - offsetY) / TILE_SIZE - bound.y;
+    // Convert screen tap → iso grid using same projection used in renderer
+    const rect = canvas.getBoundingClientRect();
+    const cssW = rect.width, cssH = rect.height;
+    const z = zoomRef.current;
+    const vw = cssW / z, vh = cssH / z;
+    // Camera-centered iso origin in virtual (post-zoom) space
+    const camIso = gridToScreen(bound.x, bound.y);
+    const offX = vw / 2 - camIso.sx;
+    const offY = vh / 2 - camIso.sy;
+    const localX = (clientX - rect.left) / z - offX;
+    const localY = (clientY - rect.top) / z - offY - ISO_TILE_H / 2;
+    const { gx, gy } = screenToGrid(localX, localY);
+    const dx = gx - bound.x;
+    const dy = gy - bound.y;
     session.keysDown.clear();
     if (Math.abs(dx) > Math.abs(dy)) session.keysDown.add(dx > 0 ? 'ArrowRight' : 'ArrowLeft');
     else session.keysDown.add(dy > 0 ? 'ArrowDown' : 'ArrowUp');
     setTimeout(() => session.keysDown.clear(), 250);
   };
+
+  // Wheel + pinch zoom
+  useEffect(() => {
+    if (phase !== 'world') return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      zoomRef.current = Math.max(1, Math.min(4, zoomRef.current * factor));
+    };
+    let pinchStart = 0; let zoomStart = zoomRef.current;
+    const dist = (t: TouchList) => {
+      const dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY;
+      return Math.hypot(dx, dy);
+    };
+    const onTS = (e: TouchEvent) => {
+      if (e.touches.length === 2) { pinchStart = dist(e.touches); zoomStart = zoomRef.current; }
+    };
+    const onTM = (e: TouchEvent) => {
+      if (e.touches.length === 2 && pinchStart > 0) {
+        e.preventDefault();
+        const d = dist(e.touches);
+        zoomRef.current = Math.max(1, Math.min(4, zoomStart * (d / pinchStart)));
+      }
+    };
+    const onTE = () => { pinchStart = 0; };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    canvas.addEventListener('touchstart', onTS, { passive: true });
+    canvas.addEventListener('touchmove', onTM, { passive: false });
+    canvas.addEventListener('touchend', onTE);
+    return () => {
+      canvas.removeEventListener('wheel', onWheel);
+      canvas.removeEventListener('touchstart', onTS);
+      canvas.removeEventListener('touchmove', onTM);
+      canvas.removeEventListener('touchend', onTE);
+    };
+  }, [phase]);
 
   const getKarmaLabel = (karma: number): string => {
     if (karma >= KARMA_THRESHOLDS.luminous) return 'Luminous';
