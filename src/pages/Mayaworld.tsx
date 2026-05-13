@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { ACCESS_CODES, TILE_SIZE, SAGE_DEFINITIONS, NARRATION_INTERVAL_MIN, NARRATION_INTERVAL_MAX, LEVEL_UNLOCKS, KARMA_THRESHOLDS } from "@/mayaworld/constants";
 import { SimMode, World, SageAction, Moment, PlayerStats } from "@/mayaworld/types";
 import { createSession, startSession, stopSession, setMode, getNearestSage, getAvailableActions, executeAction, checkMoments, addKarma, pauseSession, resumeSession, getRibbon, Session } from "@/mayaworld/sessionController";
-import { renderWorld } from "@/mayaworld/renderer";
+import { renderWorldIso, renderIsoMinimap, screenToGrid, ISO_TILE_W, ISO_TILE_H, gridToScreen } from "@/mayaworld/renderer";
 import { getNarration, getMoodThought, getInteractionResponse, getActionNarration } from "@/mayaworld/dialogueBank";
 
 type Phase = 'entry' | 'clouds' | 'world' | 'fading';
