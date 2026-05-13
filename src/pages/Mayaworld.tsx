@@ -57,6 +57,9 @@ const Mayaworld = () => {
   const rafRef = useRef<number>(0);
   const boundNameRef = useRef('');
   const cloudCanvasRef = useRef<HTMLCanvasElement>(null);
+  const zoomRef = useRef(2); // default zoom — adjusted by viewport
+  const [hudExpanded, setHudExpanded] = useState(false);
+  const [showMinimap, setShowMinimap] = useState(false);
 
   // Stagger poetic lines
   useEffect(() => {
