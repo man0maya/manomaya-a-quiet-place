@@ -790,6 +790,11 @@ const Mayaworld = () => {
           )}
 
           {/* Paused (viewer absent) overlay */}
+          {savedToast && (
+            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/85 border border-[hsl(var(--primary))]/40 rounded-full px-4 py-1.5 text-[hsl(var(--primary))] text-[12px] font-mono tracking-wider z-40 pointer-events-none">
+              ✦ View saved
+            </div>
+          )}
           {isPaused && (
             <div className="absolute inset-0 bg-black/55 backdrop-blur-sm flex items-center justify-center z-40 pointer-events-none">
               <div className="text-center px-8 py-6 bg-black/80 border border-[hsl(var(--primary))]/30 rounded-lg shadow-xl">
