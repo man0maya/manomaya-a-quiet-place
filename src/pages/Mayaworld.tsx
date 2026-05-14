@@ -927,13 +927,54 @@ const getRibbonIcon = (text: string): string => {
 
           {/* Feedback */}
           {(interactionResponse || actionFeedback) && !nearbySage && !showActionMenu && (
-            <div className="absolute bottom-10 left-0 right-0 text-center pointer-events-none px-4">
-              <div className="inline-block bg-black/85 backdrop-blur-md px-5 py-3 rounded-lg border border-[hsl(var(--primary))]/30 shadow-lg max-w-xl">
-                <p className="font-serif text-[hsl(var(--foreground))] text-[15px] leading-relaxed">
-                  {interactionResponse || actionFeedback}
-                </p>
-              </div>
-            </div>
+<div className="absolute inset-x-0 bottom-16 flex justify-center pointer-events-none px-4 z-30">
+    <div
+      className="bg-black/80 backdrop-blur-md border border-[hsl(var(--primary))]/35 rounded-2xl px-6 py-5 max-w-sm w-full shadow-2xl"
+      style={{ animation: 'sageIn 0.35s cubic-bezier(0.16,1,0.3,1)' }}
+    >
+      {/* Sage name + mood */}
+      <div className="flex items-center gap-3 mb-3">
+        <span
+          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+          style={{ backgroundColor: SAGE_DEFINITIONS.find(s => s.name === nearbySage.name)?.color || '#D4AF6A' }}
+        />
+        <span className="font-serif text-[hsl(var(--primary))] text-[15px] tracking-wide">
+          {nearbySage.name}
+        </span>
+        <span className="text-[hsl(var(--foreground))]/40 text-[11px] font-mono ml-auto italic">
+          {nearbySage.mood}
+        </span>
+      </div>
+      {/* Divider */}
+      <div className="h-px bg-[hsl(var(--primary))]/15 mb-3" />
+      {/* Thought */}
+      <p className="font-serif text-[hsl(var(--foreground))]/85 text-[13px] leading-relaxed italic text-center">
+        "{nearbySage.thought}"
+      </p>
+      {/* Relationship bar */}
+      <div className="mt-4 flex items-center gap-2">
+        <span className="text-[hsl(var(--foreground))]/35 text-[10px] font-mono">bond</span>
+        <div className="flex-1 h-0.5 bg-black/60 rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-700"
+            style={{
+              width: `${Math.min(100, Math.max(0, (nearbySage.relationship + 100) / 2))}%`,
+              backgroundColor: nearbySage.relationship >= 0
+                ? 'hsl(var(--primary))'
+                : '#ef4444',
+            }}
+          />
+        </div>
+        <span className="text-[hsl(var(--foreground))]/35 text-[10px] font-mono">
+          {nearbySage.relationship > 50 ? 'deep' : nearbySage.relationship > 0 ? 'warm' : 'distant'}
+        </span>
+      </div>
+      {/* Hint */}
+      <p className="text-center text-[hsl(var(--foreground))]/30 text-[10px] font-mono mt-3 tracking-wide">
+        press E again to speak · ESC to step back
+      </p>
+    </div>
+  </div>
           )}
 
           {/* Controls hint */}
