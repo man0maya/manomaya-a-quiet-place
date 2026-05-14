@@ -171,6 +171,11 @@
     }
   }
 
+  @keyframes ribbonIn {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
   /* Float animation */
   .float {
     animation: float 8s ease-in-out infinite;
