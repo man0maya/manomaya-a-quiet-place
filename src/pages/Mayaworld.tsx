@@ -561,6 +561,19 @@ const Mayaworld = () => {
     return 'Frozen';
   };
 
+const getRibbonIcon = (text: string): string => {
+  if (/rain|storm|cloud/i.test(text)) return '🌧';
+  if (/rainbow/i.test(text)) return '🌈';
+  if (/river|lake|water|flood/i.test(text)) return '💧';
+  if (/fire|flame|burn/i.test(text)) return '🔥';
+  if (/flower|bloom|lotus/i.test(text)) return '🌸';
+  if (/wind|breeze/i.test(text)) return '🍃';
+  if (/star|moon|night/i.test(text)) return '✦';
+  if (/sun|dawn|light/i.test(text)) return '☀';
+  if (/sage|speak|voice|speak/i.test(text)) return '·';
+  return '·';
+};
+  
   const getWeatherIcon = (w: string) => {
     if (w === 'rain') return '🌧';
     if (w === 'mist') return '🌫';
@@ -775,19 +788,24 @@ const Mayaworld = () => {
           </div>
 
           {/* Ambient ribbon — what's happening in the world */}
-          {ribbon.length > 0 && (
-            <div className="absolute top-28 right-3 max-w-[260px] pointer-events-none z-10">
-              <div className="bg-black/70 backdrop-blur-md border border-[hsl(var(--primary))]/20 rounded px-3 py-2 space-y-1">
-                {ribbon.map((r, i) => (
-                  <p key={r.ts + '-' + i}
-                     className="font-serif text-[hsl(var(--foreground))]/85 text-[12px] leading-snug"
-                     style={{ opacity: 1 - i * 0.28 }}>
-                    · {r.text}
-                  </p>
-                ))}
-              </div>
-            </div>
-          )}
+{ribbon.length > 0 && (
+  <div className="absolute top-16 right-3 max-w-[270px] pointer-events-none z-10 space-y-1.5">
+    {ribbon.map((r, i) => (
+      <div
+        key={r.ts + '-' + i}
+        className="bg-black/75 backdrop-blur-md border border-[hsl(var(--primary))]/25 rounded-lg px-3 py-2"
+        style={{
+          opacity: 1 - i * 0.30,
+          transform: `translateX(${i * 4}px)`,
+          animation: i === 0 ? 'ribbonIn 0.4s ease-out' : 'none',
+        }}>
+        <p className="font-serif text-[hsl(var(--foreground))]/90 text-[12px] leading-snug">
+          {getRibbonIcon(r.text)} {r.text}
+        </p>
+      </div>
+    ))}
+  </div>
+)}
 
           {/* Paused (viewer absent) overlay */}
           {savedToast && (
@@ -920,9 +938,9 @@ const Mayaworld = () => {
 
           {/* Controls hint */}
           {mode === 'authority' && (
-            <div className="absolute bottom-2 left-3 text-[hsl(var(--foreground))]/65 text-[10px] font-mono tracking-wider bg-black/40 px-2 py-0.5 rounded">
-              WASD move · E action · I inv · J journal · P stats
-            </div>
+<div className="absolute bottom-3 left-3 text-[hsl(var(--foreground))]/75 text-[11px] font-mono tracking-wide bg-black/72 backdrop-blur-sm border border-[hsl(var(--primary))]/18 px-3 py-1.5 rounded-full">
+  WASD move · E action · I inv · J journal · P stats
+</div>
           )}
         </>
       )}
@@ -949,8 +967,8 @@ function NearbyIndicator({ session }: { session: Session | null }) {
   return (
     <div className="absolute bottom-10 left-0 right-0 text-center pointer-events-none">
       <div className="inline-block bg-black/40 backdrop-blur-sm px-4 py-1.5 rounded border border-[hsl(var(--primary))]/10">
-        <p className="font-mono text-[hsl(var(--primary))]/30 text-[10px] tracking-wide animate-pulse">
-          Press E to speak with {nearbyName}
+        <p className="font-mono text-[hsl(var(--primary))]/80 text-[12px] tracking-wide animate-pulse">
+          · speak with {nearbyName}
         </p>
       </div>
     </div>
