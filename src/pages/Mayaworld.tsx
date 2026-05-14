@@ -752,12 +752,15 @@ const Mayaworld = () => {
 
           {/* Top right controls — icon buttons, 40x40 touch targets */}
           <div className="absolute top-3 right-3 flex gap-2 items-center z-30">
-            <button onClick={() => zoomRef.current = Math.min(4, zoomRef.current * 1.15)}
+            <button onClick={() => { zoomRef.current = Math.min(4, zoomRef.current * 1.15); savePrefs({ zoom: zoomRef.current }); }}
               aria-label="Zoom in"
               className="w-10 h-10 flex items-center justify-center text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] text-lg bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))] transition-colors">+</button>
-            <button onClick={() => zoomRef.current = Math.max(1, zoomRef.current / 1.15)}
+            <button onClick={() => { zoomRef.current = Math.max(1, zoomRef.current / 1.15); savePrefs({ zoom: zoomRef.current }); }}
               aria-label="Zoom out"
               className="w-10 h-10 flex items-center justify-center text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] text-lg bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))] transition-colors">−</button>
+            <button onClick={exportPng}
+              aria-label="Save view as PNG"
+              className="w-10 h-10 flex items-center justify-center text-base text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))] transition-colors">⤓</button>
             <button onClick={() => setShowMinimap(v => !v)}
               aria-label="Toggle minimap"
               className={`w-10 h-10 flex items-center justify-center text-base bg-black/80 backdrop-blur-md rounded-full border transition-colors ${showMinimap ? 'text-[hsl(var(--primary))] border-[hsl(var(--primary))]' : 'text-[hsl(var(--foreground))]/85 border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))]'}`}>◔</button>
