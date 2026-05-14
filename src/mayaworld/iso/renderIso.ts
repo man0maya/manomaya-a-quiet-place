@@ -686,7 +686,6 @@ function drawAmbientParticles(
       ctx.beginPath(); ctx.ellipse(x, y, mw, mw * 0.3, 0, 0, Math.PI * 2); ctx.fill();
     }
   }
-}
 
 function drawWeather(ctx: CanvasRenderingContext2D, weather: Weather, canvasW: number, canvasH: number, animFrame: number) {
   if (weather === 'rain') {
