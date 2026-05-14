@@ -272,9 +272,11 @@ const Mayaworld = () => {
       canvas.height = Math.floor(h * dpr);
       canvas.style.width = w + 'px';
       canvas.style.height = h + 'px';
-      // Pick default zoom by viewport: tighter on mobile so things feel close & readable
-      const auto = w < 600 ? 2.2 : w < 1024 ? 1.9 : 1.6;
-      zoomRef.current = auto;
+      // Only auto-pick zoom when user has no saved preference
+      if (initialPrefs.current.zoom == null) {
+        const auto = w < 600 ? 2.2 : w < 1024 ? 1.9 : 1.6;
+        zoomRef.current = auto;
+      }
     };
     resize();
     window.addEventListener('resize', resize);
@@ -284,12 +286,22 @@ const Mayaworld = () => {
       if (!session || !session.running) { rafRef.current = requestAnimationFrame(draw); return; }
       animFrameRef.current++;
       const bound = session.world.sages.find(s => s.name === session.boundSageName);
-      const camX = bound ? bound.x : session.world.width / 2;
-      const camY = bound ? bound.y : session.world.height / 2;
-      // Total canvas → render scale combines DPR × user zoom
+      const targetX = bound ? bound.x : session.world.width / 2;
+      const targetY = bound ? bound.y : session.world.height / 2;
+      // Smooth camera follow
+      if (!cameraRef.current) cameraRef.current = { x: targetX, y: targetY };
+      const cam = cameraRef.current;
+      const recentTap = (performance.now() - lastTapRef.current) < 400;
+      const ease = recentTap ? 0.18 : 0.12;
+      const dx = targetX - cam.x, dy = targetY - cam.y;
+      cam.x += Math.abs(dx) < 0.02 ? dx : dx * ease;
+      cam.y += Math.abs(dy) < 0.02 ? dy : dy * ease;
+      // Clamp to world bounds
+      cam.x = Math.max(2, Math.min(session.world.width - 2, cam.x));
+      cam.y = Math.max(2, Math.min(session.world.height - 2, cam.y));
+
       const totalZoom = dpr * zoomRef.current;
-      renderWorldIso(ctx, session.world, { x: camX, y: camY }, canvas.width, canvas.height, session.boundSageName, animFrameRef.current, totalZoom);
-      // Optional minimap (drawn at native canvas scale)
+      renderWorldIso(ctx, session.world, { x: cam.x, y: cam.y }, canvas.width, canvas.height, session.boundSageName, animFrameRef.current, totalZoom);
       if (showMinimap) renderIsoMinimap(ctx, session.world, session.boundSageName, canvas.width, canvas.height, Math.min(140, canvas.width * 0.25));
       rafRef.current = requestAnimationFrame(draw);
     };
