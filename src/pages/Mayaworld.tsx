@@ -539,7 +539,7 @@ const Mayaworld = () => {
         zoomRef.current = Math.max(1, Math.min(4, zoomStart * (d / pinchStart)));
       }
     };
-    const onTE = () => { pinchStart = 0; };
+    const onTE = () => { if (pinchStart > 0) savePrefs({ zoom: zoomRef.current }); pinchStart = 0; };
     canvas.addEventListener('wheel', onWheel, { passive: false });
     canvas.addEventListener('touchstart', onTS, { passive: true });
     canvas.addEventListener('touchmove', onTM, { passive: false });
