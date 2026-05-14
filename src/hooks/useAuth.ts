@@ -62,10 +62,13 @@ export function useAuth() {
       }
     );
 
-    // THEN check for existing session
+    // Fix #3: guard against component-unmount race between getSession and onAuthStateChange
+    let cancelled = false;
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (cancelled) return;
       if (session?.user) {
         const isAdmin = await checkAdminRole(session.user.id);
+        if (cancelled) return;
         setAuthState({
           session,
           user: session.user,
@@ -73,6 +76,7 @@ export function useAuth() {
           loading: false,
         });
       } else {
+        if (cancelled) return;
         setAuthState({
           session: null,
           user: null,
@@ -82,7 +86,10 @@ export function useAuth() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, [checkAdminRole]);
 
   const signIn = async (email: string, password: string) => {
@@ -110,7 +117,13 @@ export function useAuth() {
   };
 
   const signOut = async () => {
+    // Fix #10: optimistically clear admin state before the async event fires
+    setAuthState(prev => ({ ...prev, isAdmin: false, loading: false }));
     const { error } = await supabase.auth.signOut();
+    if (error) {
+      // Revert if signOut failed
+      setAuthState(prev => ({ ...prev, isAdmin: true }));
+    }
     return { error };
   };
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,38 +21,32 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function AdminLogin() {
-  const [isSignUp, setIsSignUp] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
-  const { signIn, signUp, user, isAdmin, loading } = useAuth();
+  const { signIn, user, isAdmin, loading } = useAuth();
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
 
-  // Redirect if already logged in as admin
-  if (!loading && user && isAdmin) {
-    navigate('/admin', { replace: true });
-    return null;
-  }
+  // Fix #17: redirect in useEffect, not during render
+  useEffect(() => {
+    if (!loading && user && isAdmin) {
+      navigate('/admin', { replace: true });
+    }
+  }, [loading, user, isAdmin, navigate]);
 
   const onSubmit = async (data: LoginFormData) => {
-    const { error } = isSignUp 
-      ? await signUp(data.email, data.password)
-      : await signIn(data.email, data.password);
+    // Fix #5: sign in only — navigation handled by useEffect once isAdmin is confirmed
+    const { error } = await signIn(data.email, data.password);
 
     if (error) {
       toast.error(error.message);
       return;
     }
 
-    if (isSignUp) {
-      toast.success('Account created! Please check your email or log in.');
-      setIsSignUp(false);
-    } else {
-      toast.success('Welcome back!');
-      navigate('/admin');
-    }
+    toast.success('Welcome back! Verifying access...');
+    // Navigation will happen via useEffect once isAdmin state resolves
   };
 
   return (
@@ -138,6 +132,7 @@ export default function AdminLogin() {
             </div>
           </div>
 
+          {/* Fix #1: Removed public sign-up — admin portal is invite-only */}
           <Button
             type="button"
             variant="outline"
@@ -159,15 +154,6 @@ export default function AdminLogin() {
             </svg>
             Sign in with Google
           </Button>
-
-          <div className="mt-4 text-center">
-            <button
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-sm text-muted-foreground hover:text-primary transition-colors"
-            >
-              {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-            </button>
-          </div>
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-6">

@@ -21,7 +21,7 @@ export function useVisitorCounter() {
           const { data } = await supabase
             .from('visitor_counter')
             .select('count')
-            .eq('id', 1)
+            .limit(1)
             .maybeSingle();
           if (data) setCount(data.count as number);
         }

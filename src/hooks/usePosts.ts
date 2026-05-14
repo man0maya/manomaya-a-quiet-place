@@ -10,7 +10,7 @@ export interface Post {
   image_url: string | null;
   status: 'draft' | 'published' | 'scheduled';
   scheduled_for: string | null;
-  display_order: number;
+  display_order: number | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

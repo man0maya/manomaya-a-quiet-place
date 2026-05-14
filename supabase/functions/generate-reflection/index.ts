@@ -120,7 +120,7 @@ Never use clichés. Never be preachy. Let wisdom emerge naturally, like dawn. Va
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Reflect upon this through the lens of ${perspective}: "${sanitizedInput}" (unique reflection #${randomSeed})` },
+          { role: "user", content: `Reflect upon this through the lens of ${perspective}: "${sanitizedInput.replace(/"/g, '\\"')}" (unique reflection #${randomSeed})` },
         ],
         temperature: 0.95,
         max_tokens: 500,

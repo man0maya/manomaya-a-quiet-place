@@ -104,16 +104,21 @@ export default function AdminPosts() {
       image_url: data.image_url || null,
       status: data.status,
       scheduled_for: data.status === 'scheduled' && data.scheduled_for ? new Date(data.scheduled_for).toISOString() : null,
-      display_order: editingPost?.display_order || 0,
+      display_order: editingPost?.display_order ?? 0,
       published_at: editingPost?.published_at || null,
     };
 
-    if (editingPost) {
-      await updatePost.mutateAsync({ ...postData, id: editingPost.id });
-    } else {
-      await createPost.mutateAsync(postData);
+    try {
+      // Fix #9: only close the form on success so the user doesn't lose input on error
+      if (editingPost) {
+        await updatePost.mutateAsync({ ...postData, id: editingPost.id });
+      } else {
+        await createPost.mutateAsync(postData);
+      }
+      setFormOpen(false);
+    } catch {
+      // Toast is already shown by the mutation's onError handler — keep form open
     }
-    setFormOpen(false);
   };
 
   const handleDelete = async () => {

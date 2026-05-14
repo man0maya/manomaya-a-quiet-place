@@ -45,11 +45,15 @@ const ShareButton = ({ title, text, url, className }: ShareButtonProps) => {
     window.open(whatsappUrl, "_blank", "noopener,noreferrer");
   };
 
-  const handleShareInstagram = () => {
-    // Instagram doesn't have a direct share URL, so we copy to clipboard
-    navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleShareInstagram = async () => {
+    // Fix #14: Instagram doesn't have a direct share URL, so we copy to clipboard
+    try {
+      await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy for Instagram:", err);
+    }
     // Open Instagram (on mobile, this may open the app)
     window.open("https://www.instagram.com/manomaya/", "_blank", "noopener,noreferrer");
   };

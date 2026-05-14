@@ -42,13 +42,18 @@ export function useReflections() {
       });
 
       if (error) throw error;
-      
+
+      // Fix #8: guard against null/unexpected response shape from edge function
+      if (!data || typeof data.quote !== 'string' || typeof data.explanation !== 'string') {
+        throw new Error('Unexpected response from reflection service');
+      }
+
       const reflection: AIReflection = {
-        id: data.id,
-        user_input: data.userInput,
+        id: data.id ?? '',
+        user_input: data.userInput ?? userInput,
         quote: data.quote,
         explanation: data.explanation,
-        created_at: data.created_at,
+        created_at: data.created_at ?? new Date().toISOString(),
       };
 
       setReflections(prev => [reflection, ...prev]);

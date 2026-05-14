@@ -27,9 +27,21 @@ export function useImageUpload(bucket: BucketName) {
     setProgress(0);
 
     try {
-      // Generate unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      // Fix #4: derive extension from MIME type whitelist, not from filename
+      // This prevents spoofed extensions like shell.php.jpg
+      const mimeToExt: Record<string, string> = {
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/gif': 'gif',
+        'image/webp': 'webp',
+        'image/svg+xml': 'svg',
+      };
+      const safeExt = mimeToExt[file.type];
+      if (!safeExt) {
+        toast.error('Unsupported image format. Please use JPG, PNG, GIF, WEBP, or SVG.');
+        return null;
+      }
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${safeExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from(bucket)

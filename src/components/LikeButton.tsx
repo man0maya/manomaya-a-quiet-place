@@ -9,12 +9,12 @@ interface LikeButtonProps {
   className?: string;
 }
 
-// Generate a session ID for anonymous users
+// Fix #2: standardise to the same key used across the whole app
 const getSessionId = () => {
-  let sessionId = localStorage.getItem("manomaya_session_id");
+  let sessionId = localStorage.getItem("manomaya_session");
   if (!sessionId) {
     sessionId = crypto.randomUUID();
-    localStorage.setItem("manomaya_session_id", sessionId);
+    localStorage.setItem("manomaya_session", sessionId);
   }
   return sessionId;
 };
@@ -74,48 +74,54 @@ const LikeButton = ({ itemId, itemType, className }: LikeButtonProps) => {
 
   const handleToggleLike = async () => {
     if (isLoading || !itemId) return;
-    
+
     setIsLoading(true);
     const sessionId = getSessionId();
+    // Snapshot previous state for rollback on error
+    const prevIsLiked = isLiked;
+    const prevCount = likeCount;
 
     try {
       if (itemType === "quote") {
         if (isLiked) {
-          await supabase.rpc("unlike_quote", {
+          setIsLiked(false);
+          setLikeCount(prev => Math.max(0, prev - 1));
+          const { error } = await supabase.rpc("unlike_quote", {
             _quote_id: itemId,
             _session_id: sessionId,
           });
-
-          setIsLiked(false);
-          setLikeCount(prev => Math.max(0, prev - 1));
+          if (error) throw error;
         } else {
-          await supabase
-            .from("quote_likes")
-            .insert({ quote_id: itemId, session_id: sessionId });
-
           setIsLiked(true);
           setLikeCount(prev => prev + 1);
+          const { error } = await supabase
+            .from("quote_likes")
+            .insert({ quote_id: itemId, session_id: sessionId });
+          if (error) throw error;
         }
       } else {
         if (isLiked) {
-          await supabase.rpc("unlike_story", {
+          setIsLiked(false);
+          setLikeCount(prev => Math.max(0, prev - 1));
+          const { error } = await supabase.rpc("unlike_story", {
             _story_id: itemId,
             _session_id: sessionId,
           });
-
-          setIsLiked(false);
-          setLikeCount(prev => Math.max(0, prev - 1));
+          if (error) throw error;
         } else {
-          await supabase
-            .from("story_likes")
-            .insert({ story_id: itemId, session_id: sessionId });
-
           setIsLiked(true);
           setLikeCount(prev => prev + 1);
+          const { error } = await supabase
+            .from("story_likes")
+            .insert({ story_id: itemId, session_id: sessionId });
+          if (error) throw error;
         }
       }
     } catch (error) {
+      // Fix #7: roll back optimistic update on error
       console.error("Error toggling like:", error);
+      setIsLiked(prevIsLiked);
+      setLikeCount(prevCount);
     } finally {
       setIsLoading(false);
     }

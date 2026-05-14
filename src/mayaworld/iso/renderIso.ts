@@ -659,34 +659,6 @@ function drawAmbientParticles(
 }
 
 
-  // Pollen motes — clear daytime only
-  if (isDay && world.weather === 'clear') {
-    for (let i = 0; i < 22; i++) {
-      const seed = i * 97.4;
-      const x = ((seed * 2.3 + animFrame * 0.22 + Math.sin(animFrame * 0.007 + i) * 14) % canvasW + canvasW) % canvasW;
-      const y = canvasH - (seed * 1.1 + animFrame * 0.28 + i * 30) % canvasH;
-      const alpha = 0.08 + Math.sin(animFrame * 0.02 + i) * 0.05;
-      ctx.fillStyle = `rgba(255,230,140,${alpha})`;
-      ctx.beginPath(); ctx.arc(x, y, 1.1, 0, Math.PI * 2); ctx.fill();
-    }
-  }
-
-  // Mist wisps — weather=mist only
-  if (world.weather === 'mist') {
-    for (let i = 0; i < 8; i++) {
-      const seed = i * 211;
-      const x = ((seed * 1.4 + animFrame * 0.6) % (canvasW + 200)) - 100;
-      const y = canvasH * (0.55 + (i % 4) * 0.1);
-      const alpha = 0.06 + Math.sin(animFrame * 0.006 + i) * 0.03;
-      const mw = 80 + (i % 3) * 40;
-      const mg = ctx.createRadialGradient(x, y, 0, x, y, mw);
-      mg.addColorStop(0, `rgba(210,220,230,${alpha})`);
-      mg.addColorStop(1, `rgba(210,220,230,0)`);
-      ctx.fillStyle = mg;
-      ctx.beginPath(); ctx.ellipse(x, y, mw, mw * 0.3, 0, 0, Math.PI * 2); ctx.fill();
-    }
-  }
-
 function drawWeather(ctx: CanvasRenderingContext2D, weather: Weather, canvasW: number, canvasH: number, animFrame: number) {
   if (weather === 'rain') {
     ctx.strokeStyle = 'rgba(150,180,220,0.22)';
