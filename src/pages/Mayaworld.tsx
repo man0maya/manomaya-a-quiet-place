@@ -491,8 +491,27 @@ const Mayaworld = () => {
     session.keysDown.clear();
     if (Math.abs(dx) > Math.abs(dy)) session.keysDown.add(dx > 0 ? 'ArrowRight' : 'ArrowLeft');
     else session.keysDown.add(dy > 0 ? 'ArrowDown' : 'ArrowUp');
+    lastTapRef.current = performance.now();
     setTimeout(() => session.keysDown.clear(), 250);
   };
+
+  const exportPng = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `manomaya-${boundNameRef.current.toLowerCase()}-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setSavedToast(true);
+      setTimeout(() => setSavedToast(false), 1800);
+    }, 'image/png');
+  }, []);
 
   // Wheel + pinch zoom
   useEffect(() => {
@@ -503,6 +522,7 @@ const Mayaworld = () => {
       e.preventDefault();
       const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
       zoomRef.current = Math.max(1, Math.min(4, zoomRef.current * factor));
+      savePrefs({ zoom: zoomRef.current });
     };
     let pinchStart = 0; let zoomStart = zoomRef.current;
     const dist = (t: TouchList) => {
