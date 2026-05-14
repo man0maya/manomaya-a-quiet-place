@@ -1,6 +1,7 @@
 import { World, Sage, DroppedItem, Weather, TimeOfDay } from '../types';
 import { TILE_COLORS, SAGE_DEFINITIONS } from '../constants';
 import { ISO_TILE_W, ISO_TILE_H, ISO_ELEV, RAISED, gridToScreen } from './projection';
+import { drawSageSprite, getSageSprite } from './spriteAtlas';
 
 interface Camera { x: number; y: number; }
 
