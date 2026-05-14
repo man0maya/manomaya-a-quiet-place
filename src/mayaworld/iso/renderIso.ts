@@ -1,6 +1,7 @@
 import { World, Sage, DroppedItem, Weather, TimeOfDay } from '../types';
 import { TILE_COLORS, SAGE_DEFINITIONS } from '../constants';
 import { ISO_TILE_W, ISO_TILE_H, ISO_ELEV, RAISED, gridToScreen } from './projection';
+import { drawSageSprite, getSageSprite } from './spriteAtlas';
 
 interface Camera { x: number; y: number; }
 
@@ -197,7 +198,7 @@ function drawDecor(ctx: CanvasRenderingContext2D, type: string, cx: number, cy: 
 
 const SAGE_PROPS = ['flame', 'fan', 'lotus', 'staff', 'crystal', 'beads', 'bowl', 'scroll', 'gourd'] as const;
 
-// Iso character — ~24px tall, hooded silhouette w/ accent + prop
+// Iso character — uses generated sprite when loaded, falls back to procedural
 function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: number, animFrame: number, isBound: boolean, sageIndex: number) {
   const def = SAGE_DEFINITIONS.find(d => d.name === sage.name);
   const robe = def?.robeColor || '#888';
@@ -212,17 +213,18 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
   const idleBob = !isWalking && !isResting ? Math.sin(animFrame * 0.04 + sageIndex) * 0.7 : 0;
   const bx = cx;
   const by = cy + stepBob + idleBob - 4; // lift onto top face
+  const facingLeft = (sage.targetX - sage.x) < -0.05;
 
   // Contact shadow on the diamond
-  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillStyle = 'rgba(0,0,0,0.32)';
   ctx.beginPath();
-  ctx.ellipse(bx, by + 12, 6, 2, 0, 0, Math.PI * 2);
+  ctx.ellipse(bx, by + 12, 9, 2.6, 0, 0, Math.PI * 2);
   ctx.fill();
 
   // Aura
   if (isBound || isMeditating) {
-    const a = isBound ? 0.32 : 0.18;
-    const r = isBound ? 22 : 16;
+    const a = isBound ? 0.34 : 0.22;
+    const r = isBound ? 28 : 20;
     const [rR, gR, bR] = hexToRgb(accent);
     const grad = ctx.createRadialGradient(bx, by + 4, 0, bx, by + 4, r);
     grad.addColorStop(0, `rgba(${rR},${gR},${bR},${a})`);
@@ -242,59 +244,43 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
     ctx.stroke();
   }
 
-  // Body (lower robe, tapered)
-  ctx.fillStyle = shade(robe, 0.7);
-  ctx.beginPath();
-  ctx.moveTo(bx - 5, by + 11);
-  ctx.lineTo(bx + 5, by + 11);
-  ctx.lineTo(bx + 3, by + 2);
-  ctx.lineTo(bx - 3, by + 2);
-  ctx.closePath(); ctx.fill();
+  // Sprite (preferred) — height tuned so sage feet sit on tile, head is comfortably readable
+  const spriteH = isBound ? 56 : 50;
+  const drewSprite = !!getSageSprite(sage.name);
+  if (drewSprite) {
+    drawSageSprite(ctx, sage.name, bx, by + 13, spriteH, facingLeft);
+  } else {
+    // === Procedural fallback (kept for safety while sprites preload) ===
+    ctx.fillStyle = shade(robe, 0.7);
+    ctx.beginPath();
+    ctx.moveTo(bx - 5, by + 11); ctx.lineTo(bx + 5, by + 11);
+    ctx.lineTo(bx + 3, by + 2); ctx.lineTo(bx - 3, by + 2);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = robe; ctx.fillRect(bx - 4, by, 8, 5);
+    ctx.fillStyle = accent; ctx.fillRect(bx - 4, by + 4, 8, 1);
+    ctx.fillStyle = '#E8CFA8'; ctx.beginPath(); ctx.arc(bx, by - 3, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = accent; ctx.beginPath(); ctx.arc(bx, by - 4, 3.6, Math.PI, 0); ctx.fill();
+  }
 
-  // Mid-robe
-  ctx.fillStyle = robe;
-  ctx.fillRect(bx - 4, by, 8, 5);
-
-  // Sash
-  ctx.fillStyle = accent;
-  ctx.fillRect(bx - 4, by + 4, 8, 1);
-
-  // Head
-  ctx.fillStyle = '#E8CFA8';
-  ctx.beginPath(); ctx.arc(bx, by - 3, 3, 0, Math.PI * 2); ctx.fill();
-
-  // Hood
-  ctx.fillStyle = accent;
-  ctx.beginPath(); ctx.arc(bx, by - 4, 3.6, Math.PI, 0); ctx.fill();
-  ctx.fillStyle = shade(accent, 0.55);
-  ctx.fillRect(bx - 3.5, by - 4, 7, 1);
-
-  // Eyes
-  ctx.fillStyle = '#1A1208';
-  ctx.fillRect(bx - 1, by - 3, 1, 1);
-  ctx.fillRect(bx + 1, by - 3, 1, 1);
-
-  // Prop
-  const prop = SAGE_PROPS[sageIndex % SAGE_PROPS.length];
-  drawIsoProp(ctx, prop, bx, by, accent, animFrame);
-
-  // Name label
-  ctx.font = isBound ? 'bold 11px "Cormorant Garamond", serif' : '10px "Cormorant Garamond", serif';
+  // Name label — positioned above the sprite head
+  const labelY = by - (drewSprite ? spriteH - 8 : 12);
+  ctx.font = isBound ? 'bold 12px "Cormorant Garamond", serif' : '11px "Cormorant Garamond", serif';
   ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(0,0,0,0.85)';
-  ctx.fillText(sage.name, bx + 0.5, by - 12.5);
-  ctx.fillStyle = isBound ? '#F5D88A' : 'rgba(245,242,236,0.92)';
-  ctx.fillText(sage.name, bx, by - 13);
+  ctx.fillStyle = 'rgba(0,0,0,0.9)';
+  ctx.fillText(sage.name, bx + 0.5, labelY + 0.5);
+  ctx.fillStyle = isBound ? '#F5D88A' : 'rgba(245,242,236,0.95)';
+  ctx.fillText(sage.name, bx, labelY);
 
   // Bound diamond marker
   if (isBound) {
     const a = Math.sin(animFrame * 0.06) * 0.3 + 0.7;
     ctx.fillStyle = `rgba(212,175,106,${a})`;
+    const my = labelY - 9;
     ctx.beginPath();
-    ctx.moveTo(bx, by - 22);
-    ctx.lineTo(bx + 3, by - 19);
-    ctx.lineTo(bx, by - 16);
-    ctx.lineTo(bx - 3, by - 19);
+    ctx.moveTo(bx, my - 3);
+    ctx.lineTo(bx + 3, my);
+    ctx.lineTo(bx, my + 3);
+    ctx.lineTo(bx - 3, my);
     ctx.closePath(); ctx.fill();
   }
 
@@ -302,32 +288,27 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
   if (sage.dialogue) {
     const max = 42;
     const text = sage.dialogue.length > max ? sage.dialogue.slice(0, max - 1) + '…' : sage.dialogue;
-    ctx.font = 'italic 12px "Cormorant Garamond", serif';
+    ctx.font = 'italic 13px "Cormorant Garamond", serif';
     const tw = ctx.measureText(text).width;
-    const pw = Math.max(tw + 16, 60);
-    const ph = 20;
+    const pw = Math.max(tw + 18, 64);
+    const ph = 22;
     const px = bx - pw / 2;
-    const py = by - 38;
-    // shadow
+    const py = labelY - 30;
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    roundRect(ctx, px + 1, py + 1.5, pw, ph, 5); ctx.fill();
-    // bg
+    roundRect(ctx, px + 1, py + 1.5, pw, ph, 6); ctx.fill();
     ctx.fillStyle = 'rgba(245,242,236,0.97)';
-    roundRect(ctx, px, py, pw, ph, 5); ctx.fill();
-    // accent border
+    roundRect(ctx, px, py, pw, ph, 6); ctx.fill();
     const [rA, gA, bA] = hexToRgb(accent);
     ctx.fillStyle = `rgba(${rA},${gA},${bA},0.9)`;
-    ctx.fillRect(px, py + 3, 2, ph - 6);
-    // tail
+    ctx.fillRect(px, py + 4, 2, ph - 8);
     ctx.fillStyle = 'rgba(245,242,236,0.97)';
     ctx.beginPath();
     ctx.moveTo(bx - 3, py + ph);
     ctx.lineTo(bx, py + ph + 4);
     ctx.lineTo(bx + 3, py + ph);
     ctx.closePath(); ctx.fill();
-    // text
     ctx.fillStyle = '#1F2A2A';
-    ctx.fillText(text, bx, py + 13.5);
+    ctx.fillText(text, bx, py + 15);
   }
 }
 
@@ -402,13 +383,8 @@ export function renderWorldIso(
 ) {
   ctx.clearRect(0, 0, canvasW, canvasH);
 
-  const phase = world.dayPhase;
-  let skyColor = '#1A2840';
-  if (phase > 0.15 && phase < 0.55) skyColor = '#1F3852';
-  else if (phase > 0.55 && phase < 0.75) skyColor = '#2A2030';
-  else skyColor = '#08101F';
-  ctx.fillStyle = skyColor;
-  ctx.fillRect(0, 0, canvasW, canvasH);
+  // === Layered ambient backdrop (parallax + time-of-day) ===
+  drawAmbientSky(ctx, world.dayPhase, world.weather, camera, canvasW, canvasH, animFrame);
 
   ctx.save();
   ctx.scale(zoom, zoom);
@@ -490,6 +466,7 @@ export function renderWorldIso(
   ctx.restore();
 
   // Day/night overlay (drawn at native scale)
+  const phase = world.dayPhase;
   let nightAlpha = 0;
   if (phase > 0.75) nightAlpha = (phase - 0.75) / 0.25 * 0.45;
   else if (phase < 0.15) nightAlpha = (1 - phase / 0.15) * 0.4;
@@ -512,6 +489,77 @@ export function renderWorldIso(
   drawWeather(ctx, world.weather, canvasW, canvasH, animFrame);
 
   ctx.textAlign = 'start';
+}
+
+// === Ambient sky: gradient + parallax cloud bands tinted by time-of-day ===
+// Anchor stops: dawn, day, dusk, night → interpolated via dayPhase 0..1
+// dayPhase: 0=midnight, 0.25=dawn, 0.5=noon, 0.75=dusk, ~1=midnight again
+type Stop = [number, number, number]; // RGB
+const SKY_TOP: Record<string, Stop> = {
+  night: [10, 14, 32], dawn: [212, 140, 110], day: [120, 178, 210], dusk: [180, 90, 110],
+};
+const SKY_BOT: Record<string, Stop> = {
+  night: [22, 28, 56], dawn: [240, 200, 160], day: [200, 220, 230], dusk: [60, 40, 80],
+};
+function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
+function lerpStop(a: Stop, b: Stop, t: number): Stop {
+  return [lerp(a[0], b[0], t) | 0, lerp(a[1], b[1], t) | 0, lerp(a[2], b[2], t) | 0];
+}
+function pickPalette(phase: number): { top: Stop; bot: Stop } {
+  // Keyframes: 0 night, 0.22 dawn, 0.5 day, 0.78 dusk, 1 night
+  const keys: { p: number; key: keyof typeof SKY_TOP }[] = [
+    { p: 0, key: 'night' }, { p: 0.22, key: 'dawn' }, { p: 0.5, key: 'day' },
+    { p: 0.78, key: 'dusk' }, { p: 1, key: 'night' },
+  ];
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (phase >= keys[i].p && phase <= keys[i + 1].p) {
+      const t = (phase - keys[i].p) / (keys[i + 1].p - keys[i].p);
+      return {
+        top: lerpStop(SKY_TOP[keys[i].key], SKY_TOP[keys[i + 1].key], t),
+        bot: lerpStop(SKY_BOT[keys[i].key], SKY_BOT[keys[i + 1].key], t),
+      };
+    }
+  }
+  return { top: SKY_TOP.night, bot: SKY_BOT.night };
+}
+
+function drawAmbientSky(
+  ctx: CanvasRenderingContext2D,
+  phase: number,
+  weather: Weather,
+  camera: { x: number; y: number },
+  canvasW: number,
+  canvasH: number,
+  animFrame: number,
+) {
+  const { top, bot } = pickPalette(phase);
+  const grad = ctx.createLinearGradient(0, 0, 0, canvasH);
+  grad.addColorStop(0, `rgb(${top[0]},${top[1]},${top[2]})`);
+  grad.addColorStop(1, `rgb(${bot[0]},${bot[1]},${bot[2]})`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvasW, canvasH);
+
+  // Parallax cloud bands — drift with camera + slow time
+  const bandAlpha = weather === 'mist' ? 0.22 : weather === 'rain' ? 0.14 : 0.10;
+  const cloudColor = phase > 0.78 || phase < 0.22 ? '210,220,240' : '255,250,240';
+  const bands = [
+    { y: canvasH * 0.18, h: canvasH * 0.18, speed: 0.06, parX: 0.4, parY: 0.18, op: bandAlpha },
+    { y: canvasH * 0.32, h: canvasH * 0.16, speed: 0.12, parX: 0.7, parY: 0.28, op: bandAlpha * 0.85 },
+    { y: canvasH * 0.46, h: canvasH * 0.10, speed: 0.20, parX: 1.0, parY: 0.42, op: bandAlpha * 0.6 },
+  ];
+  for (const b of bands) {
+    const offset = animFrame * b.speed - camera.x * b.parX * 6 + camera.y * b.parY * 2;
+    const cy = b.y + Math.sin(animFrame * 0.003) * 4;
+    for (let i = -2; i < 14; i++) {
+      const cx = ((i * 180 + offset) % (canvasW + 360)) - 180;
+      const cw = 130 + (i % 3) * 40;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, cw);
+      g.addColorStop(0, `rgba(${cloudColor},${b.op})`);
+      g.addColorStop(1, `rgba(${cloudColor},0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.ellipse(cx, cy, cw, b.h * 0.7, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
 }
 
 function drawWeather(ctx: CanvasRenderingContext2D, weather: Weather, canvasW: number, canvasH: number, animFrame: number) {

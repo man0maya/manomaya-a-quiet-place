@@ -1,83 +1,145 @@
-## Mayaworld Phase 2 — Isometric View, Default Zoom & UI Refinement
+# Mayaworld — Phase 3 Polish + Character Art Upgrade
 
-The screenshot shows the world rendered at 1:1 device pixels on a mobile screen — sages are ~12px tall, tiles are 16px, and the HUD chip eats the corner. Phase 2 fixes both **clarity** (zoom/scale) and **perspective** (true isometric), plus polishes the HUD for the small viewport.
-
-### Goals
-1. **Default zoom**: world feels close and readable on phones without pinch-zoom
-2. **Isometric projection**: clean 2:1 iso tiles + characters with clear depth
-3. **HUD refinement**: bigger touch targets, less corner clutter, dialogue/narration easier to read on mobile
-4. No copied assets from `isomiddleearth` — we generate our own iso tile atlas in code (zero AI tokens, zero network)
+Four runtime upgrades plus a concrete plan to retire the "cubicle" sage sprites in favor of richer art.
 
 ---
 
-### Step 1 — Default zoom & clarity (ships immediately, even before iso)
+## 1. Ambient parallax + time-of-day mood
 
-- Introduce a `RENDER_SCALE` factor (default `2` on mobile ≤640px, `1.75` on tablet, `1.5` on desktop) applied as a single canvas scale transform around the whole render. Tiles + sprites stay crisp because we keep `image-rendering: pixelated` on the canvas element.
-- Add pinch-to-zoom and wheel-zoom (clamped 1×–3×) with smooth interpolation; double-tap to reset.
-- Camera continues to follow the bound sage; we just draw fewer, larger tiles per screen.
-- Increase sage label font from 7→10px and dialogue bubble from 8→11px at base scale.
+In `iso/renderIso.ts`, add a layered backdrop drawn before the world:
 
-### Step 2 — Isometric tile renderer
+- **Far layer**: gradient sky that shifts by `world.dayPhase` — dawn peach, midday teal, dusk amber, night indigo (interpolated, not stepped).
+- **Mid layer**: 3 soft cloud bands drifting at 0.02/0.05/0.09 px/frame, offset by `camera.x * 0.05` and `camera.y * 0.03` for parallax against the world.
+- **Near layer**: faint particles tied to `world.weather` (rain streaks, mist puffs, wind motes) — already partly modeled, just bind drift to camera delta.
+- **Ambient tint pass**: existing night overlay becomes a 4-stop tint (dawn warm, day neutral, dusk rose, night cool) at ≤30% alpha so the world stays legible.
 
-New module `src/mayaworld/iso/`:
+All pure rendering — no new state, no AI calls.
 
-```text
-iso/
-  projection.ts    gridToScreen(x,y,z), screenToGrid(), painter sort
-  tileAtlas.ts     procedural atlas: 64×40 diamond top + side walls per tile type
-  characterAtlas.ts pre-bake 4-dir × 2-frame sprite per sage (32×56)
-  renderIso.ts     replaces the orthographic loop in renderer.ts
+## 2. Persist zoom + HUD/minimap prefs
+
+New tiny module `src/mayaworld/prefs.ts` wrapping `localStorage` under key `mayaworld:prefs:v1`:
+
+```ts
+{ zoom: number; hudExpanded: boolean; showMinimap: boolean }
 ```
 
-Tile atlas (no external assets):
-- Base diamond top: 64w × 32h
-- Side wall: +8h for elevated tiles (forest canopy, hut roof, mountain, temple, shrine, ruins)
-- Tile types reuse our existing palette in `constants.ts`; we just re-shape them as iso diamonds with a top face + two side faces (left dark, right slightly darker)
-- Animated variants (water, tall_grass, flower) get 2 atlas frames blitted by `animFrame % 60`
+In `Mayaworld.tsx`:
 
-Character atlas:
-- Each sage rendered once into 4 directions × 2 frames using the redesigned silhouette from Phase 1, then blitted as a sprite — much faster than per-frame procedural draw
-- Z-height bump for prop (flame, crystal, lotus) so it sits correctly above the iso tile
+- On mount: hydrate `zoomRef`, `hudExpanded`, `showMinimap` from prefs (fallback to viewport-based default for zoom).
+- On change (zoom buttons, pinch end, HUD toggle, minimap toggle): debounced write (200ms).
+- Guard against SSR / blocked storage with try/catch.
 
-Render loop:
-- Painter's order: sort tiles by (y + x) ascending, then z; sages inserted into the same sorted list so they correctly occlude/get-occluded by huts, trees, mountains.
-- Camera converts bound-sage `(gx, gy)` → screen via `gridToScreen` and centers it.
-- Same `world.tiles[][]` data — only renderer changes. `agentEngine`, `sessionController`, `dialogueBank`, weather, day/night overlay all keep working.
+## 3. One-tap PNG export
 
-### Step 3 — Iso-aware tap input
+Add an icon button in the top-right HUD cluster ("Save view"). Handler:
 
-`screenToGrid()` translates tap coordinates back to grid cells so authority-mode movement on touch still works. Movement still snaps to 4 cardinal directions.
+1. Pause the RAF for one frame.
+2. Re-render to an offscreen `OffscreenCanvas` at 2× current zoom for crispness.
+3. `toBlob('image/png')` → trigger download as `manomaya-{sage}-{phase}-{timestamp}.png`.
+4. Add a subtle "Saved" toast via existing narration line.
 
-### Step 4 — UI refinement (mobile-first)
+No watermark by default (matches the no-Lovable-badge memory). Pure client-side.
 
-Driven by the screenshot:
-- **Top-left HUD chip**: collapse into a single compact pill that shows only sage swatch + name; tap to expand stats. Removes the four stacked rows.
-- **Top-right**: replace text buttons with two icon buttons (eye / door). Larger 40×40 touch targets. `aria-label` for accessibility.
-- **Minimap**: hide by default on mobile, toggle via small icon in the bottom-right; on tablet/desktop keep visible but smaller.
-- **Narration line**: increase to 16px serif, max-width capped, sit above a safe-area inset so OS nav bar doesn't cover it.
-- **Dialogue overlay** (in-canvas bubble + bottom RPG panel): both already redesigned in Phase 1; here we just bump font and add `safe-area-inset-bottom` padding.
-- **Pause overlay**: center seal mark, larger serif copy (already mostly clean).
+## 4. Smooth camera that tracks the bound sage
 
-### Step 5 — Realm-aware ambient tint (light Phase 3 preview)
+Today the camera snaps to `bound.x, bound.y` each frame. Replace with eased follow:
 
-While in iso mode, the strongest realm under the bound sage (forest / shore / sanctum / hamlet / highlands / wilds) softly tints the global overlay (very subtle, ≤8% alpha). Free preview of Phase 3's mood system — costs nothing.
+- Add `cameraRef = { x, y }` in `Mayaworld.tsx`.
+- Each frame: `camera.x += (targetX - camera.x) * 0.12` (same for y), with snap when distance < 0.02.
+- On tap-to-move (authority mode), the sage's `targetX/targetY` already drives motion; the camera will glide naturally. Add a stronger ease (0.18) for the first 400ms after a tap so the pan feels intentional.
+- Clamp camera so we never reveal beyond the world edge.
 
 ---
 
-### Out of scope (deferred to Phase 3)
-- Realm-specific particle systems (petals, fireflies, gulls)
-- Decorative prop layer (lanterns, prayer flags, water-lilies)
-- Sage daily intentions
-- Audio toggle
+## 5. Fixing the "cubicle" characters
 
-### Files we expect to change / add
-- **New**: `src/mayaworld/iso/projection.ts`, `tileAtlas.ts`, `characterAtlas.ts`, `renderIso.ts`
-- **Modified**: `src/mayaworld/renderer.ts` (delegate to iso renderer when enabled), `src/pages/Mayaworld.tsx` (HUD refinement, zoom controls, pinch handlers, iso tap mapping), `src/mayaworld/constants.ts` (add `RENDER_SCALE`, iso tile dims)
+The current sages are drawn procedurally as ~24px stacked rectangles in `drawIsoSage`. That's why they read as cubes. Two paths — **pick one or combine**:
 
-### Risk & mitigation
-- Iso painter sort over an 80×80 grid = 6400 tiles per frame. Mitigation: only sort/draw the tiles inside the camera viewport (~150–250 tiles), and use cached atlas blits.
-- Mobile perf: we cap RENDER_SCALE × DPR at 3 effective pixels and use `image-rendering: pixelated` to avoid blurry upscale.
-- Atlas generation runs once at session start (~50ms one-time cost).
+### Path A — Stay procedural, add silhouette + shading (fast, no assets)
 
-### Suggested rollout
-Ship Step 1 (zoom/clarity) first inside the same commit as Steps 2–3 (iso) so the user sees the big visual jump together. Step 4 (HUD polish) and Step 5 (realm tint) round it out.
+Refactor `drawIsoSage` to draw on a 32×48 logical sprite:
+
+- Tapered robe outline via `bezierCurveTo` instead of stacked rects.
+- 2px outer dark outline (`#1a1208`) for readable silhouette at small sizes.
+- Hood drape with a 2-tone shadow under the chin.
+- 4-direction body turn driven by `targetX-x, targetY-y` (NE/NW/SE/SW).
+- Subtle robe sway sin-wave on idle.
+
+Cost: 1 file, ~1 hour. Keeps everything dynamic and tinted by sage palette.
+
+### Path B — Use real pixel-art sprite sheets (recommended for "alive" feel)
+
+**Where to source (free, permissive):**
+
+
+| Source                                                                                          | License            | What to grab                           |
+| ----------------------------------------------------------------------------------------------- | ------------------ | -------------------------------------- |
+| [itch.io — "Mana Seed Character Base" by Seliel the Shaper](https://seliel-the-shaper.itch.io/) | CC0 / paid         | 8-direction walk/idle base, 32×32      |
+| [OpenGameArt — "LPC" sage/monk packs](https://opengameart.org/content/lpc-base-assets)          | CC-BY-SA 3.0 / GPL | Robed character bases, 64×64           |
+| [itch.io — "Tiny Hero Sprites" by Free Game Assets](https://free-game-assets.itch.io/)          | Free w/ credit     | Compact 16×16 pixel humans             |
+| [Kenney.nl — Toon Characters / Isometric](https://kenney.nl/assets)                             | CC0                | Isometric character bases ready-to-use |
+
+
+For an isometric look that matches the Hasan Harman ISO Middle Earth feel, **Kenney's Isometric Characters** + **Seliel's Mana Seed** recolored is the cleanest combo.
+
+**File layout to add:**
+
+```
+public/
+  mayaworld/
+    sprites/
+      sages/
+        agni.png        ← 4 dirs × 4 frames, 32×48 each (128×192 sheet)
+        ila.png
+        ... (one per sage, 9 total)
+        _base.png       ← shared base if you recolor at runtime
+      props/
+        flame.png  fan.png  lotus.png  staff.png  ...
+src/
+  mayaworld/
+    iso/
+      spriteAtlas.ts    ← loads sheets once, exposes drawSprite(name, dir, frame)
+      renderIso.ts      ← drawIsoSage swaps to spriteAtlas.drawSage(...)
+```
+
+`spriteAtlas.ts` responsibilities:
+
+- Preload all 9 sheets during the cloud-transition phase (already a 4s window — perfect).
+- Expose `drawSage(ctx, name, dir, frame, x, y)` that blits the right 32×48 cell with `imageSmoothingEnabled = false`.
+- Optional runtime tint: draw to offscreen canvas → `globalCompositeOperation = 'source-atop'` with sage's accent color at low alpha.
+
+**How the user supplies assets:**
+
+1. Download a sprite pack from one of the links above.
+2. Drop the PNG sheets into `public/mayaworld/sprites/sages/` named `<sage-lowercase>.png`.
+3. Tell me the cell size and frame layout (e.g. "32×48, row=direction, col=frame") — I'll wire `spriteAtlas.ts` to match.
+
+If preferred, I can also generate stylized 4-direction sprites with the image tool (one per sage, ~9 calls) — but external pixel art will look more cohesive and "hand-crafted."
+
+### Recommendation
+
+Ship **Path A** in the same commit as items 1–4 above so the world feels immediately alive. Then do **Path B** as a follow-up once you've picked an asset pack — that's the jump from "cubicles" to "characters."
+
+---
+
+## Files touched
+
+**Edit**
+
+- `src/mayaworld/iso/renderIso.ts` — parallax sky, ambient tint, refined `drawIsoSage` (Path A)
+- `src/pages/Mayaworld.tsx` — pref hydration, eased camera, export button + handler
+
+**New**
+
+- `src/mayaworld/prefs.ts` — localStorage wrapper
+- `src/mayaworld/iso/spriteAtlas.ts` *(only if Path B is approved)*
+- `public/mayaworld/sprites/...` *(your asset drop)*
+
+## Out of scope
+
+- Audio ambience (mentioned earlier as Phase 3 deferred)
+- Realm-specific particle systems beyond what weather already does
+
+---
+
+**Decision needed:** Path A only, or A now + B after you pick an asset pack? And if B — do you want to source the pack yourself or have me generate sprites? Path B and generate the sprites please 

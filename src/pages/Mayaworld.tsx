@@ -4,6 +4,8 @@ import { SimMode, World, SageAction, Moment, PlayerStats } from "@/mayaworld/typ
 import { createSession, startSession, stopSession, setMode, getNearestSage, getAvailableActions, executeAction, checkMoments, addKarma, pauseSession, resumeSession, getRibbon, Session } from "@/mayaworld/sessionController";
 import { renderWorldIso, renderIsoMinimap, screenToGrid, ISO_TILE_W, ISO_TILE_H, gridToScreen } from "@/mayaworld/renderer";
 import { getNarration, getMoodThought, getInteractionResponse, getActionNarration } from "@/mayaworld/dialogueBank";
+import { loadPrefs, savePrefs } from "@/mayaworld/prefs";
+import { preloadSageSprites } from "@/mayaworld/iso/spriteAtlas";
 
 type Phase = 'entry' | 'clouds' | 'world' | 'fading';
 
@@ -57,9 +59,20 @@ const Mayaworld = () => {
   const rafRef = useRef<number>(0);
   const boundNameRef = useRef('');
   const cloudCanvasRef = useRef<HTMLCanvasElement>(null);
-  const zoomRef = useRef(2); // default zoom — adjusted by viewport
-  const [hudExpanded, setHudExpanded] = useState(false);
-  const [showMinimap, setShowMinimap] = useState(false);
+  const initialPrefs = useRef(loadPrefs());
+  const zoomRef = useRef(initialPrefs.current.zoom ?? 2);
+  const cameraRef = useRef<{ x: number; y: number } | null>(null);
+  const lastTapRef = useRef<number>(0);
+  const [hudExpanded, setHudExpanded] = useState(initialPrefs.current.hudExpanded ?? false);
+  const [showMinimap, setShowMinimap] = useState(initialPrefs.current.showMinimap ?? false);
+  const [savedToast, setSavedToast] = useState(false);
+
+  // Persist UI prefs
+  useEffect(() => { savePrefs({ hudExpanded }); }, [hudExpanded]);
+  useEffect(() => { savePrefs({ showMinimap }); }, [showMinimap]);
+
+  // Preload sage sprites once on mount
+  useEffect(() => { preloadSageSprites(); }, []);
 
   // Stagger poetic lines
   useEffect(() => {
@@ -259,9 +272,11 @@ const Mayaworld = () => {
       canvas.height = Math.floor(h * dpr);
       canvas.style.width = w + 'px';
       canvas.style.height = h + 'px';
-      // Pick default zoom by viewport: tighter on mobile so things feel close & readable
-      const auto = w < 600 ? 2.2 : w < 1024 ? 1.9 : 1.6;
-      zoomRef.current = auto;
+      // Only auto-pick zoom when user has no saved preference
+      if (initialPrefs.current.zoom == null) {
+        const auto = w < 600 ? 2.2 : w < 1024 ? 1.9 : 1.6;
+        zoomRef.current = auto;
+      }
     };
     resize();
     window.addEventListener('resize', resize);
@@ -271,12 +286,22 @@ const Mayaworld = () => {
       if (!session || !session.running) { rafRef.current = requestAnimationFrame(draw); return; }
       animFrameRef.current++;
       const bound = session.world.sages.find(s => s.name === session.boundSageName);
-      const camX = bound ? bound.x : session.world.width / 2;
-      const camY = bound ? bound.y : session.world.height / 2;
-      // Total canvas → render scale combines DPR × user zoom
+      const targetX = bound ? bound.x : session.world.width / 2;
+      const targetY = bound ? bound.y : session.world.height / 2;
+      // Smooth camera follow
+      if (!cameraRef.current) cameraRef.current = { x: targetX, y: targetY };
+      const cam = cameraRef.current;
+      const recentTap = (performance.now() - lastTapRef.current) < 400;
+      const ease = recentTap ? 0.18 : 0.12;
+      const dx = targetX - cam.x, dy = targetY - cam.y;
+      cam.x += Math.abs(dx) < 0.02 ? dx : dx * ease;
+      cam.y += Math.abs(dy) < 0.02 ? dy : dy * ease;
+      // Clamp to world bounds
+      cam.x = Math.max(2, Math.min(session.world.width - 2, cam.x));
+      cam.y = Math.max(2, Math.min(session.world.height - 2, cam.y));
+
       const totalZoom = dpr * zoomRef.current;
-      renderWorldIso(ctx, session.world, { x: camX, y: camY }, canvas.width, canvas.height, session.boundSageName, animFrameRef.current, totalZoom);
-      // Optional minimap (drawn at native canvas scale)
+      renderWorldIso(ctx, session.world, { x: cam.x, y: cam.y }, canvas.width, canvas.height, session.boundSageName, animFrameRef.current, totalZoom);
       if (showMinimap) renderIsoMinimap(ctx, session.world, session.boundSageName, canvas.width, canvas.height, Math.min(140, canvas.width * 0.25));
       rafRef.current = requestAnimationFrame(draw);
     };
@@ -466,8 +491,27 @@ const Mayaworld = () => {
     session.keysDown.clear();
     if (Math.abs(dx) > Math.abs(dy)) session.keysDown.add(dx > 0 ? 'ArrowRight' : 'ArrowLeft');
     else session.keysDown.add(dy > 0 ? 'ArrowDown' : 'ArrowUp');
+    lastTapRef.current = performance.now();
     setTimeout(() => session.keysDown.clear(), 250);
   };
+
+  const exportPng = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `manomaya-${boundNameRef.current.toLowerCase()}-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setSavedToast(true);
+      setTimeout(() => setSavedToast(false), 1800);
+    }, 'image/png');
+  }, []);
 
   // Wheel + pinch zoom
   useEffect(() => {
@@ -478,6 +522,7 @@ const Mayaworld = () => {
       e.preventDefault();
       const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
       zoomRef.current = Math.max(1, Math.min(4, zoomRef.current * factor));
+      savePrefs({ zoom: zoomRef.current });
     };
     let pinchStart = 0; let zoomStart = zoomRef.current;
     const dist = (t: TouchList) => {
@@ -494,7 +539,7 @@ const Mayaworld = () => {
         zoomRef.current = Math.max(1, Math.min(4, zoomStart * (d / pinchStart)));
       }
     };
-    const onTE = () => { pinchStart = 0; };
+    const onTE = () => { if (pinchStart > 0) savePrefs({ zoom: zoomRef.current }); pinchStart = 0; };
     canvas.addEventListener('wheel', onWheel, { passive: false });
     canvas.addEventListener('touchstart', onTS, { passive: true });
     canvas.addEventListener('touchmove', onTM, { passive: false });
@@ -707,12 +752,15 @@ const Mayaworld = () => {
 
           {/* Top right controls — icon buttons, 40x40 touch targets */}
           <div className="absolute top-3 right-3 flex gap-2 items-center z-30">
-            <button onClick={() => zoomRef.current = Math.min(4, zoomRef.current * 1.15)}
+            <button onClick={() => { zoomRef.current = Math.min(4, zoomRef.current * 1.15); savePrefs({ zoom: zoomRef.current }); }}
               aria-label="Zoom in"
               className="w-10 h-10 flex items-center justify-center text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] text-lg bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))] transition-colors">+</button>
-            <button onClick={() => zoomRef.current = Math.max(1, zoomRef.current / 1.15)}
+            <button onClick={() => { zoomRef.current = Math.max(1, zoomRef.current / 1.15); savePrefs({ zoom: zoomRef.current }); }}
               aria-label="Zoom out"
               className="w-10 h-10 flex items-center justify-center text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] text-lg bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))] transition-colors">−</button>
+            <button onClick={exportPng}
+              aria-label="Save view as PNG"
+              className="w-10 h-10 flex items-center justify-center text-base text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))] transition-colors">⤓</button>
             <button onClick={() => setShowMinimap(v => !v)}
               aria-label="Toggle minimap"
               className={`w-10 h-10 flex items-center justify-center text-base bg-black/80 backdrop-blur-md rounded-full border transition-colors ${showMinimap ? 'text-[hsl(var(--primary))] border-[hsl(var(--primary))]' : 'text-[hsl(var(--foreground))]/85 border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))]'}`}>◔</button>
@@ -742,6 +790,11 @@ const Mayaworld = () => {
           )}
 
           {/* Paused (viewer absent) overlay */}
+          {savedToast && (
+            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/85 border border-[hsl(var(--primary))]/40 rounded-full px-4 py-1.5 text-[hsl(var(--primary))] text-[12px] font-mono tracking-wider z-40 pointer-events-none">
+              ✦ View saved
+            </div>
+          )}
           {isPaused && (
             <div className="absolute inset-0 bg-black/55 backdrop-blur-sm flex items-center justify-center z-40 pointer-events-none">
               <div className="text-center px-8 py-6 bg-black/80 border border-[hsl(var(--primary))]/30 rounded-lg shadow-xl">
