@@ -466,6 +466,7 @@ export function renderWorldIso(
   ctx.restore();
 
   // Day/night overlay (drawn at native scale)
+  const phase = world.dayPhase;
   let nightAlpha = 0;
   if (phase > 0.75) nightAlpha = (phase - 0.75) / 0.25 * 0.45;
   else if (phase < 0.15) nightAlpha = (1 - phase / 0.15) * 0.4;
