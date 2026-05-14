@@ -491,6 +491,77 @@ export function renderWorldIso(
   ctx.textAlign = 'start';
 }
 
+// === Ambient sky: gradient + parallax cloud bands tinted by time-of-day ===
+// Anchor stops: dawn, day, dusk, night → interpolated via dayPhase 0..1
+// dayPhase: 0=midnight, 0.25=dawn, 0.5=noon, 0.75=dusk, ~1=midnight again
+type Stop = [number, number, number]; // RGB
+const SKY_TOP: Record<string, Stop> = {
+  night: [10, 14, 32], dawn: [212, 140, 110], day: [120, 178, 210], dusk: [180, 90, 110],
+};
+const SKY_BOT: Record<string, Stop> = {
+  night: [22, 28, 56], dawn: [240, 200, 160], day: [200, 220, 230], dusk: [60, 40, 80],
+};
+function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
+function lerpStop(a: Stop, b: Stop, t: number): Stop {
+  return [lerp(a[0], b[0], t) | 0, lerp(a[1], b[1], t) | 0, lerp(a[2], b[2], t) | 0];
+}
+function pickPalette(phase: number): { top: Stop; bot: Stop } {
+  // Keyframes: 0 night, 0.22 dawn, 0.5 day, 0.78 dusk, 1 night
+  const keys: { p: number; key: keyof typeof SKY_TOP }[] = [
+    { p: 0, key: 'night' }, { p: 0.22, key: 'dawn' }, { p: 0.5, key: 'day' },
+    { p: 0.78, key: 'dusk' }, { p: 1, key: 'night' },
+  ];
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (phase >= keys[i].p && phase <= keys[i + 1].p) {
+      const t = (phase - keys[i].p) / (keys[i + 1].p - keys[i].p);
+      return {
+        top: lerpStop(SKY_TOP[keys[i].key], SKY_TOP[keys[i + 1].key], t),
+        bot: lerpStop(SKY_BOT[keys[i].key], SKY_BOT[keys[i + 1].key], t),
+      };
+    }
+  }
+  return { top: SKY_TOP.night, bot: SKY_BOT.night };
+}
+
+function drawAmbientSky(
+  ctx: CanvasRenderingContext2D,
+  phase: number,
+  weather: Weather,
+  camera: { x: number; y: number },
+  canvasW: number,
+  canvasH: number,
+  animFrame: number,
+) {
+  const { top, bot } = pickPalette(phase);
+  const grad = ctx.createLinearGradient(0, 0, 0, canvasH);
+  grad.addColorStop(0, `rgb(${top[0]},${top[1]},${top[2]})`);
+  grad.addColorStop(1, `rgb(${bot[0]},${bot[1]},${bot[2]})`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvasW, canvasH);
+
+  // Parallax cloud bands — drift with camera + slow time
+  const bandAlpha = weather === 'mist' ? 0.22 : weather === 'rain' ? 0.14 : 0.10;
+  const cloudColor = phase > 0.78 || phase < 0.22 ? '210,220,240' : '255,250,240';
+  const bands = [
+    { y: canvasH * 0.18, h: canvasH * 0.18, speed: 0.06, parX: 0.4, parY: 0.18, op: bandAlpha },
+    { y: canvasH * 0.32, h: canvasH * 0.16, speed: 0.12, parX: 0.7, parY: 0.28, op: bandAlpha * 0.85 },
+    { y: canvasH * 0.46, h: canvasH * 0.10, speed: 0.20, parX: 1.0, parY: 0.42, op: bandAlpha * 0.6 },
+  ];
+  for (const b of bands) {
+    const offset = animFrame * b.speed - camera.x * b.parX * 6 + camera.y * b.parY * 2;
+    const cy = b.y + Math.sin(animFrame * 0.003) * 4;
+    for (let i = -2; i < 14; i++) {
+      const cx = ((i * 180 + offset) % (canvasW + 360)) - 180;
+      const cw = 130 + (i % 3) * 40;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, cw);
+      g.addColorStop(0, `rgba(${cloudColor},${b.op})`);
+      g.addColorStop(1, `rgba(${cloudColor},0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.ellipse(cx, cy, cw, b.h * 0.7, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+}
+
 function drawWeather(ctx: CanvasRenderingContext2D, weather: Weather, canvasW: number, canvasH: number, animFrame: number) {
   if (weather === 'rain') {
     ctx.strokeStyle = 'rgba(150,180,220,0.22)';
