@@ -658,38 +658,6 @@ function drawAmbientParticles(
   }
 }
 
-function drawAmbientParticles(
-  ctx: CanvasRenderingContext2D,
-  world: World,
-  canvasW: number,
-  canvasH: number,
-  animFrame: number,
-) {
-  const phase = world.dayPhase;
-  const isNight = phase < 0.18 || phase > 0.82;
-  const isDusk  = phase > 0.68 && phase <= 0.82;
-  const isDay   = phase >= 0.3 && phase <= 0.6;
-
-  // Fireflies at dusk and night
-  if (isNight || isDusk) {
-    const count = isNight ? 18 : 9;
-    for (let i = 0; i < count; i++) {
-      const seed = i * 137.508;
-      const x = ((seed * 1.7 + animFrame * 0.18 + Math.sin(animFrame * 0.012 + i) * 28) % canvasW + canvasW) % canvasW;
-      const y = ((seed * 0.9 + animFrame * 0.06 + Math.cos(animFrame * 0.009 + i * 0.7) * 18) % (canvasH * 0.75) + canvasH * 0.12);
-      const blink = Math.sin(animFrame * 0.11 + i * 2.3);
-      if (blink < -0.2) continue;
-      const alpha = Math.max(0, blink) * (isNight ? 0.75 : 0.45);
-      const r = 1.2 + Math.abs(blink) * 1.1;
-      const g = ctx.createRadialGradient(x, y, 0, x, y, r * 5);
-      g.addColorStop(0, `rgba(255,220,110,${alpha * 0.5})`);
-      g.addColorStop(1, `rgba(255,200,80,0)`);
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(x, y, r * 5, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = `rgba(255,240,160,${alpha})`;
-      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-    }
-  }
 
   // Pollen motes — clear daytime only
   if (isDay && world.weather === 'clear') {
