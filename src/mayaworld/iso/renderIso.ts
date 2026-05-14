@@ -284,31 +284,59 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
     ctx.closePath(); ctx.fill();
   }
 
-  // Dialogue bubble — large, parchment, serif (mobile-readable)
+// Dialogue bubble — parchment, serif, multi-line word-wrap (up to 3 lines)
   if (sage.dialogue) {
-    const max = 42;
-    const text = sage.dialogue.length > max ? sage.dialogue.slice(0, max - 1) + '…' : sage.dialogue;
     ctx.font = 'italic 13px "Cormorant Garamond", serif';
-    const tw = ctx.measureText(text).width;
-    const pw = Math.max(tw + 18, 64);
-    const ph = 22;
+    const maxLineW = 172;
+    const lineH = 17;
+    const padX = 11, padY = 9;
+
+    // Word-wrap into lines
+    const words = sage.dialogue.split(' ');
+    const lines: string[] = [];
+    let cur = '';
+    for (const word of words) {
+      const test = cur ? cur + ' ' + word : word;
+      if (ctx.measureText(test).width > maxLineW && cur) {
+        lines.push(cur);
+        cur = word;
+        if (lines.length >= 3) { cur = ''; break; }
+      } else {
+        cur = test;
+      }
+    }
+    if (cur && lines.length < 3) lines.push(cur);
+    if (!lines.length) lines.push(sage.dialogue.slice(0, 38) + '…');
+
+    const widestLine = Math.max(...lines.map(l => ctx.measureText(l).width));
+    const pw = Math.min(widestLine + padX * 2, maxLineW + padX * 2);
+    const ph = lines.length * lineH + padY * 2;
     const px = bx - pw / 2;
-    const py = labelY - 30;
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    roundRect(ctx, px + 1, py + 1.5, pw, ph, 6); ctx.fill();
-    ctx.fillStyle = 'rgba(245,242,236,0.97)';
-    roundRect(ctx, px, py, pw, ph, 6); ctx.fill();
+    const py = labelY - ph - 10;
+
+    // Drop shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    roundRect(ctx, px + 1, py + 2, pw, ph, 7); ctx.fill();
+    // Parchment body
+    ctx.fillStyle = 'rgba(246,243,237,0.97)';
+    roundRect(ctx, px, py, pw, ph, 7); ctx.fill();
+    // Accent left bar
     const [rA, gA, bA] = hexToRgb(accent);
-    ctx.fillStyle = `rgba(${rA},${gA},${bA},0.9)`;
-    ctx.fillRect(px, py + 4, 2, ph - 8);
-    ctx.fillStyle = 'rgba(245,242,236,0.97)';
+    ctx.fillStyle = `rgba(${rA},${gA},${bA},0.85)`;
+    ctx.fillRect(px, py + 6, 2.5, ph - 12);
+    // Tail pointer
+    ctx.fillStyle = 'rgba(246,243,237,0.97)';
     ctx.beginPath();
-    ctx.moveTo(bx - 3, py + ph);
-    ctx.lineTo(bx, py + ph + 4);
-    ctx.lineTo(bx + 3, py + ph);
+    ctx.moveTo(bx - 4, py + ph);
+    ctx.lineTo(bx, py + ph + 6);
+    ctx.lineTo(bx + 4, py + ph);
     ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#1F2A2A';
-    ctx.fillText(text, bx, py + 15);
+    // Text
+    ctx.fillStyle = '#1C2828';
+    ctx.textAlign = 'center';
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], bx, py + padY + i * lineH + 11);
+    }
   }
 }
 
