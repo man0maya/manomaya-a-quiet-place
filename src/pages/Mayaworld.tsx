@@ -59,9 +59,20 @@ const Mayaworld = () => {
   const rafRef = useRef<number>(0);
   const boundNameRef = useRef('');
   const cloudCanvasRef = useRef<HTMLCanvasElement>(null);
-  const zoomRef = useRef(2); // default zoom — adjusted by viewport
-  const [hudExpanded, setHudExpanded] = useState(false);
-  const [showMinimap, setShowMinimap] = useState(false);
+  const initialPrefs = useRef(loadPrefs());
+  const zoomRef = useRef(initialPrefs.current.zoom ?? 2);
+  const cameraRef = useRef<{ x: number; y: number } | null>(null);
+  const lastTapRef = useRef<number>(0);
+  const [hudExpanded, setHudExpanded] = useState(initialPrefs.current.hudExpanded ?? false);
+  const [showMinimap, setShowMinimap] = useState(initialPrefs.current.showMinimap ?? false);
+  const [savedToast, setSavedToast] = useState(false);
+
+  // Persist UI prefs
+  useEffect(() => { savePrefs({ hudExpanded }); }, [hudExpanded]);
+  useEffect(() => { savePrefs({ showMinimap }); }, [showMinimap]);
+
+  // Preload sage sprites once on mount
+  useEffect(() => { preloadSageSprites(); }, []);
 
   // Stagger poetic lines
   useEffect(() => {
