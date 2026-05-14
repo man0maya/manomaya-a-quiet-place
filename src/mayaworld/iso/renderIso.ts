@@ -383,13 +383,8 @@ export function renderWorldIso(
 ) {
   ctx.clearRect(0, 0, canvasW, canvasH);
 
-  const phase = world.dayPhase;
-  let skyColor = '#1A2840';
-  if (phase > 0.15 && phase < 0.55) skyColor = '#1F3852';
-  else if (phase > 0.55 && phase < 0.75) skyColor = '#2A2030';
-  else skyColor = '#08101F';
-  ctx.fillStyle = skyColor;
-  ctx.fillRect(0, 0, canvasW, canvasH);
+  // === Layered ambient backdrop (parallax + time-of-day) ===
+  drawAmbientSky(ctx, world.dayPhase, world.weather, camera, canvasW, canvasH, animFrame);
 
   ctx.save();
   ctx.scale(zoom, zoom);
