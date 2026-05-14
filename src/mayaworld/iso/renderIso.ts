@@ -513,7 +513,9 @@ export function renderWorldIso(
     }
   }
 
-  // Weather (existing styles work at native res)
+// Ambient particles (fireflies, pollen, mist wisps)
+  drawAmbientParticles(ctx, world, canvasW, canvasH, animFrame);
+  // Weather
   drawWeather(ctx, world.weather, canvasW, canvasH, animFrame);
 
   ctx.textAlign = 'start';
@@ -586,6 +588,71 @@ function drawAmbientSky(
       g.addColorStop(1, `rgba(${cloudColor},0)`);
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.ellipse(cx, cy, cw, b.h * 0.7, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+}
+
+// Ambient particles — slow drifting motes that make the world breathe at idle
+function drawAmbientParticles(
+  ctx: CanvasRenderingContext2D,
+  world: World,
+  canvasW: number,
+  canvasH: number,
+  animFrame: number,
+) {
+  const phase = world.dayPhase;
+  const isNight = phase < 0.18 || phase > 0.82;
+  const isDusk  = phase > 0.68 && phase <= 0.82;
+  const isDay   = phase >= 0.3 && phase <= 0.6;
+
+  // Fireflies — appear at dusk and night, warm amber glow, slow drift
+  if (isNight || isDusk) {
+    const count = isNight ? 18 : 9;
+    for (let i = 0; i < count; i++) {
+      const seed = i * 137.508;
+      const x = ((seed * 1.7 + animFrame * 0.18 + Math.sin(animFrame * 0.012 + i) * 28) % canvasW + canvasW) % canvasW;
+      const y = ((seed * 0.9 + animFrame * 0.06 + Math.cos(animFrame * 0.009 + i * 0.7) * 18) % (canvasH * 0.75) + canvasH * 0.12);
+      const blink = Math.sin(animFrame * 0.11 + i * 2.3);
+      if (blink < -0.2) continue; // off phase
+      const alpha = Math.max(0, blink) * (isNight ? 0.75 : 0.45);
+      const r = 1.2 + Math.abs(blink) * 1.1;
+      // glow halo
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r * 5);
+      g.addColorStop(0, `rgba(255,220,110,${alpha * 0.5})`);
+      g.addColorStop(1, `rgba(255,200,80,0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, r * 5, 0, Math.PI * 2); ctx.fill();
+      // bright core
+      ctx.fillStyle = `rgba(255,240,160,${alpha})`;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // Pollen motes — daytime, slow upward drift, near-invisible
+  if (isDay && world.weather === 'clear') {
+    for (let i = 0; i < 22; i++) {
+      const seed = i * 97.4;
+      const x = ((seed * 2.3 + animFrame * 0.22 + Math.sin(animFrame * 0.007 + i) * 14) % canvasW + canvasW) % canvasW;
+      const y = ((canvasH - (seed * 1.1 + animFrame * 0.28 + i * 30) % canvasH));
+      const alpha = 0.08 + Math.sin(animFrame * 0.02 + i) * 0.05;
+      ctx.fillStyle = `rgba(255,230,140,${alpha})`;
+      ctx.beginPath(); ctx.arc(x, y, 1.1, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // Mist wisps — weather=mist, slow horizontal drift at ground level
+  if (world.weather === 'mist') {
+    for (let i = 0; i < 8; i++) {
+      const seed = i * 211;
+      const x = ((seed * 1.4 + animFrame * 0.6) % (canvasW + 200)) - 100;
+      const y = canvasH * (0.55 + (i % 4) * 0.1);
+      const alpha = 0.06 + Math.sin(animFrame * 0.006 + i) * 0.03;
+      const mw = 80 + (i % 3) * 40;
+      const mg = ctx.createRadialGradient(x, y, 0, x, y, mw);
+      mg.addColorStop(0, `rgba(210,220,230,${alpha})`);
+      mg.addColorStop(1, `rgba(210,220,230,0)`);
+      ctx.fillStyle = mg;
+      ctx.beginPath(); ctx.ellipse(x, y, mw, mw * 0.3, 0, 0, Math.PI * 2); ctx.fill();
     }
   }
 }
