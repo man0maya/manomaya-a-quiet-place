@@ -198,7 +198,7 @@ function drawDecor(ctx: CanvasRenderingContext2D, type: string, cx: number, cy: 
 
 const SAGE_PROPS = ['flame', 'fan', 'lotus', 'staff', 'crystal', 'beads', 'bowl', 'scroll', 'gourd'] as const;
 
-// Iso character — ~24px tall, hooded silhouette w/ accent + prop
+// Iso character — uses generated sprite when loaded, falls back to procedural
 function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: number, animFrame: number, isBound: boolean, sageIndex: number) {
   const def = SAGE_DEFINITIONS.find(d => d.name === sage.name);
   const robe = def?.robeColor || '#888';
@@ -213,17 +213,18 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
   const idleBob = !isWalking && !isResting ? Math.sin(animFrame * 0.04 + sageIndex) * 0.7 : 0;
   const bx = cx;
   const by = cy + stepBob + idleBob - 4; // lift onto top face
+  const facingLeft = (sage.targetX - sage.x) < -0.05;
 
   // Contact shadow on the diamond
-  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillStyle = 'rgba(0,0,0,0.32)';
   ctx.beginPath();
-  ctx.ellipse(bx, by + 12, 6, 2, 0, 0, Math.PI * 2);
+  ctx.ellipse(bx, by + 12, 9, 2.6, 0, 0, Math.PI * 2);
   ctx.fill();
 
   // Aura
   if (isBound || isMeditating) {
-    const a = isBound ? 0.32 : 0.18;
-    const r = isBound ? 22 : 16;
+    const a = isBound ? 0.34 : 0.22;
+    const r = isBound ? 28 : 20;
     const [rR, gR, bR] = hexToRgb(accent);
     const grad = ctx.createRadialGradient(bx, by + 4, 0, bx, by + 4, r);
     grad.addColorStop(0, `rgba(${rR},${gR},${bR},${a})`);
@@ -243,59 +244,43 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
     ctx.stroke();
   }
 
-  // Body (lower robe, tapered)
-  ctx.fillStyle = shade(robe, 0.7);
-  ctx.beginPath();
-  ctx.moveTo(bx - 5, by + 11);
-  ctx.lineTo(bx + 5, by + 11);
-  ctx.lineTo(bx + 3, by + 2);
-  ctx.lineTo(bx - 3, by + 2);
-  ctx.closePath(); ctx.fill();
+  // Sprite (preferred) — height tuned so sage feet sit on tile, head is comfortably readable
+  const spriteH = isBound ? 56 : 50;
+  const drewSprite = !!getSageSprite(sage.name);
+  if (drewSprite) {
+    drawSageSprite(ctx, sage.name, bx, by + 13, spriteH, facingLeft);
+  } else {
+    // === Procedural fallback (kept for safety while sprites preload) ===
+    ctx.fillStyle = shade(robe, 0.7);
+    ctx.beginPath();
+    ctx.moveTo(bx - 5, by + 11); ctx.lineTo(bx + 5, by + 11);
+    ctx.lineTo(bx + 3, by + 2); ctx.lineTo(bx - 3, by + 2);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = robe; ctx.fillRect(bx - 4, by, 8, 5);
+    ctx.fillStyle = accent; ctx.fillRect(bx - 4, by + 4, 8, 1);
+    ctx.fillStyle = '#E8CFA8'; ctx.beginPath(); ctx.arc(bx, by - 3, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = accent; ctx.beginPath(); ctx.arc(bx, by - 4, 3.6, Math.PI, 0); ctx.fill();
+  }
 
-  // Mid-robe
-  ctx.fillStyle = robe;
-  ctx.fillRect(bx - 4, by, 8, 5);
-
-  // Sash
-  ctx.fillStyle = accent;
-  ctx.fillRect(bx - 4, by + 4, 8, 1);
-
-  // Head
-  ctx.fillStyle = '#E8CFA8';
-  ctx.beginPath(); ctx.arc(bx, by - 3, 3, 0, Math.PI * 2); ctx.fill();
-
-  // Hood
-  ctx.fillStyle = accent;
-  ctx.beginPath(); ctx.arc(bx, by - 4, 3.6, Math.PI, 0); ctx.fill();
-  ctx.fillStyle = shade(accent, 0.55);
-  ctx.fillRect(bx - 3.5, by - 4, 7, 1);
-
-  // Eyes
-  ctx.fillStyle = '#1A1208';
-  ctx.fillRect(bx - 1, by - 3, 1, 1);
-  ctx.fillRect(bx + 1, by - 3, 1, 1);
-
-  // Prop
-  const prop = SAGE_PROPS[sageIndex % SAGE_PROPS.length];
-  drawIsoProp(ctx, prop, bx, by, accent, animFrame);
-
-  // Name label
-  ctx.font = isBound ? 'bold 11px "Cormorant Garamond", serif' : '10px "Cormorant Garamond", serif';
+  // Name label — positioned above the sprite head
+  const labelY = by - (drewSprite ? spriteH - 8 : 12);
+  ctx.font = isBound ? 'bold 12px "Cormorant Garamond", serif' : '11px "Cormorant Garamond", serif';
   ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(0,0,0,0.85)';
-  ctx.fillText(sage.name, bx + 0.5, by - 12.5);
-  ctx.fillStyle = isBound ? '#F5D88A' : 'rgba(245,242,236,0.92)';
-  ctx.fillText(sage.name, bx, by - 13);
+  ctx.fillStyle = 'rgba(0,0,0,0.9)';
+  ctx.fillText(sage.name, bx + 0.5, labelY + 0.5);
+  ctx.fillStyle = isBound ? '#F5D88A' : 'rgba(245,242,236,0.95)';
+  ctx.fillText(sage.name, bx, labelY);
 
   // Bound diamond marker
   if (isBound) {
     const a = Math.sin(animFrame * 0.06) * 0.3 + 0.7;
     ctx.fillStyle = `rgba(212,175,106,${a})`;
+    const my = labelY - 9;
     ctx.beginPath();
-    ctx.moveTo(bx, by - 22);
-    ctx.lineTo(bx + 3, by - 19);
-    ctx.lineTo(bx, by - 16);
-    ctx.lineTo(bx - 3, by - 19);
+    ctx.moveTo(bx, my - 3);
+    ctx.lineTo(bx + 3, my);
+    ctx.lineTo(bx, my + 3);
+    ctx.lineTo(bx - 3, my);
     ctx.closePath(); ctx.fill();
   }
 
@@ -303,32 +288,27 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
   if (sage.dialogue) {
     const max = 42;
     const text = sage.dialogue.length > max ? sage.dialogue.slice(0, max - 1) + '…' : sage.dialogue;
-    ctx.font = 'italic 12px "Cormorant Garamond", serif';
+    ctx.font = 'italic 13px "Cormorant Garamond", serif';
     const tw = ctx.measureText(text).width;
-    const pw = Math.max(tw + 16, 60);
-    const ph = 20;
+    const pw = Math.max(tw + 18, 64);
+    const ph = 22;
     const px = bx - pw / 2;
-    const py = by - 38;
-    // shadow
+    const py = labelY - 30;
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    roundRect(ctx, px + 1, py + 1.5, pw, ph, 5); ctx.fill();
-    // bg
+    roundRect(ctx, px + 1, py + 1.5, pw, ph, 6); ctx.fill();
     ctx.fillStyle = 'rgba(245,242,236,0.97)';
-    roundRect(ctx, px, py, pw, ph, 5); ctx.fill();
-    // accent border
+    roundRect(ctx, px, py, pw, ph, 6); ctx.fill();
     const [rA, gA, bA] = hexToRgb(accent);
     ctx.fillStyle = `rgba(${rA},${gA},${bA},0.9)`;
-    ctx.fillRect(px, py + 3, 2, ph - 6);
-    // tail
+    ctx.fillRect(px, py + 4, 2, ph - 8);
     ctx.fillStyle = 'rgba(245,242,236,0.97)';
     ctx.beginPath();
     ctx.moveTo(bx - 3, py + ph);
     ctx.lineTo(bx, py + ph + 4);
     ctx.lineTo(bx + 3, py + ph);
     ctx.closePath(); ctx.fill();
-    // text
     ctx.fillStyle = '#1F2A2A';
-    ctx.fillText(text, bx, py + 13.5);
+    ctx.fillText(text, bx, py + 15);
   }
 }
 
