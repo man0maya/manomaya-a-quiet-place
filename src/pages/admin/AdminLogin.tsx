@@ -67,9 +67,7 @@ export default function AdminLogin() {
 
         {/* Form Card */}
         <div className="bg-card rounded-xl border border-border p-8 card-shadow">
-          <h1 className="text-xl font-serif text-foreground mb-6">
-            {isSignUp ? 'Create Account' : 'Welcome Back'}
-          </h1>
+          <h1 className="text-xl font-serif text-foreground mb-6">Welcome Back</h1>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
@@ -119,7 +117,7 @@ export default function AdminLogin() {
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {isSignUp ? 'Create Account' : 'Sign In'}
+              Sign In
             </Button>
           </form>
 
