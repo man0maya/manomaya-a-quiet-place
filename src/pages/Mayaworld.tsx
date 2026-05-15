@@ -304,12 +304,15 @@ const Mayaworld = () => {
       const dx = targetX - cam.x, dy = targetY - cam.y;
       cam.x += Math.abs(dx) < 0.02 ? dx : dx * ease;
       cam.y += Math.abs(dy) < 0.02 ? dy : dy * ease;
-      // Clamp to world bounds
-      cam.x = Math.max(2, Math.min(session.world.width - 2, cam.x));
-      cam.y = Math.max(2, Math.min(session.world.height - 2, cam.y));
+      // Apply user pan offset on top of follow camera
+      const finalX = cam.x + panOffsetRef.current.x;
+      const finalY = cam.y + panOffsetRef.current.y;
+      // Clamp final camera to world bounds
+      const cX = Math.max(2, Math.min(session.world.width - 2, finalX));
+      const cY = Math.max(2, Math.min(session.world.height - 2, finalY));
 
       const totalZoom = dpr * zoomRef.current;
-      renderWorldIso(ctx, session.world, { x: cam.x, y: cam.y }, canvas.width, canvas.height, session.boundSageName, animFrameRef.current, totalZoom);
+      renderWorldIso(ctx, session.world, { x: cX, y: cY }, canvas.width, canvas.height, session.boundSageName, animFrameRef.current, totalZoom, { reduceMotion: reduceMotionRef.current });
       if (showMinimap) renderIsoMinimap(ctx, session.world, session.boundSageName, canvas.width, canvas.height, Math.min(140, canvas.width * 0.25));
       rafRef.current = requestAnimationFrame(draw);
     };
