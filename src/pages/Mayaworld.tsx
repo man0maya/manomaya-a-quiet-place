@@ -527,7 +527,7 @@ const Mayaworld = () => {
     }, 'image/png');
   }, []);
 
-  // Wheel + pinch zoom
+  // Wheel + pinch zoom + drag-to-pan (touch & mouse)
   useEffect(() => {
     if (phase !== 'world') return;
     const canvas = canvasRef.current;
@@ -554,15 +554,71 @@ const Mayaworld = () => {
       }
     };
     const onTE = () => { if (pinchStart > 0) savePrefs({ zoom: zoomRef.current }); pinchStart = 0; };
+
+    // === Drag-to-pan via Pointer Events ===
+    const DRAG_THRESHOLD = 6; // px
+    const PAN_LIMIT = 8; // tiles beyond bound sage
+    let pStartX = 0, pStartY = 0, panStartX = 0, panStartY = 0;
+    let pointerDown = false, dragged = false, pointerId = -1;
+
+    const onPointerDown = (e: PointerEvent) => {
+      // Pinch handled separately; ignore secondary touches
+      if (e.pointerType === 'touch' && pinchStart > 0) return;
+      pointerDown = true;
+      dragged = false;
+      pointerId = e.pointerId;
+      pStartX = e.clientX; pStartY = e.clientY;
+      panStartX = panOffsetRef.current.x;
+      panStartY = panOffsetRef.current.y;
+      try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    };
+    const onPointerMove = (e: PointerEvent) => {
+      if (!pointerDown || e.pointerId !== pointerId) return;
+      if (pinchStart > 0) { pointerDown = false; return; }
+      const dxPx = e.clientX - pStartX;
+      const dyPx = e.clientY - pStartY;
+      if (!dragged && Math.hypot(dxPx, dyPx) < DRAG_THRESHOLD) return;
+      if (!dragged) { dragged = true; setIsDragging(true); }
+      // Convert pixel delta → tile delta via inverse iso projection
+      const z = zoomRef.current;
+      const { gx, gy } = screenToGrid(-dxPx / z, -dyPx / z);
+      const nx = panStartX + gx;
+      const ny = panStartY + gy;
+      panOffsetRef.current.x = Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, nx));
+      panOffsetRef.current.y = Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, ny));
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      if (e.pointerId !== pointerId) return;
+      try { canvas.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+      const wasDragged = dragged;
+      pointerDown = false;
+      dragged = false;
+      pointerId = -1;
+      if (wasDragged) { setIsDragging(false); return; }
+      // Treat as tap-to-move
+      tapToMove(e.clientX, e.clientY);
+    };
+    const onPointerCancel = () => {
+      pointerDown = false; dragged = false; pointerId = -1; setIsDragging(false);
+    };
+
     canvas.addEventListener('wheel', onWheel, { passive: false });
     canvas.addEventListener('touchstart', onTS, { passive: true });
     canvas.addEventListener('touchmove', onTM, { passive: false });
     canvas.addEventListener('touchend', onTE);
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointercancel', onPointerCancel);
     return () => {
       canvas.removeEventListener('wheel', onWheel);
       canvas.removeEventListener('touchstart', onTS);
       canvas.removeEventListener('touchmove', onTM);
       canvas.removeEventListener('touchend', onTE);
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('pointercancel', onPointerCancel);
     };
   }, [phase]);
 
