@@ -4,7 +4,7 @@ import { SimMode, World, SageAction, Moment, PlayerStats } from "@/mayaworld/typ
 import { createSession, startSession, stopSession, setMode, getNearestSage, getAvailableActions, executeAction, checkMoments, addKarma, pauseSession, resumeSession, getRibbon, Session } from "@/mayaworld/sessionController";
 import { renderWorldIso, renderIsoMinimap, screenToGrid, ISO_TILE_W, ISO_TILE_H, gridToScreen } from "@/mayaworld/renderer";
 import { getNarration, getMoodThought, getInteractionResponse, getActionNarration } from "@/mayaworld/dialogueBank";
-import { loadPrefs, savePrefs } from "@/mayaworld/prefs";
+import { loadPrefs, savePrefs, prefersReducedMotion } from "@/mayaworld/prefs";
 import { preloadSageSprites } from "@/mayaworld/iso/spriteAtlas";
 
 type Phase = 'entry' | 'clouds' | 'world' | 'fading';
@@ -62,14 +62,22 @@ const Mayaworld = () => {
   const initialPrefs = useRef(loadPrefs());
   const zoomRef = useRef(initialPrefs.current.zoom ?? 2);
   const cameraRef = useRef<{ x: number; y: number } | null>(null);
+  const panOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const lastTapRef = useRef<number>(0);
   const [hudExpanded, setHudExpanded] = useState(initialPrefs.current.hudExpanded ?? false);
   const [showMinimap, setShowMinimap] = useState(initialPrefs.current.showMinimap ?? false);
+  const [reduceMotion, setReduceMotion] = useState<boolean>(
+    initialPrefs.current.reduceMotion ?? prefersReducedMotion()
+  );
+  const reduceMotionRef = useRef(reduceMotion);
+  useEffect(() => { reduceMotionRef.current = reduceMotion; }, [reduceMotion]);
   const [savedToast, setSavedToast] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Persist UI prefs
   useEffect(() => { savePrefs({ hudExpanded }); }, [hudExpanded]);
   useEffect(() => { savePrefs({ showMinimap }); }, [showMinimap]);
+  useEffect(() => { savePrefs({ reduceMotion }); }, [reduceMotion]);
 
   // Preload sage sprites once on mount
   useEffect(() => { preloadSageSprites(); }, []);
