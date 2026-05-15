@@ -234,7 +234,7 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
   }
 
   // Meditation ripple
-  if (isMeditating) {
+  if (isMeditating && !reduceMotion) {
     const ring = (animFrame * 0.5 + sageIndex * 12) % 22 + 8;
     const [rR, gR, bR] = hexToRgb(accent);
     ctx.strokeStyle = `rgba(${rR},${gR},${bR},${Math.max(0, 0.22 - ring * 0.008)})`;
