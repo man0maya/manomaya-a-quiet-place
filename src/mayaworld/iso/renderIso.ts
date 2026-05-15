@@ -564,6 +564,7 @@ function drawAmbientSky(
   canvasW: number,
   canvasH: number,
   animFrame: number,
+  reduceMotion = false,
 ) {
   const { top, bot } = pickPalette(phase);
   const grad = ctx.createLinearGradient(0, 0, 0, canvasH);
@@ -573,6 +574,8 @@ function drawAmbientSky(
   ctx.fillRect(0, 0, canvasW, canvasH);
 
   // Parallax cloud bands — drift with camera + slow time
+  const motionScale = reduceMotion ? 0.15 : 1;
+  const parallaxScale = reduceMotion ? 0 : 1;
   const bandAlpha = weather === 'mist' ? 0.22 : weather === 'rain' ? 0.14 : 0.10;
   const cloudColor = phase > 0.78 || phase < 0.22 ? '210,220,240' : '255,250,240';
   const bands = [
@@ -581,8 +584,8 @@ function drawAmbientSky(
     { y: canvasH * 0.46, h: canvasH * 0.10, speed: 0.20, parX: 1.0, parY: 0.42, op: bandAlpha * 0.6 },
   ];
   for (const b of bands) {
-    const offset = animFrame * b.speed - camera.x * b.parX * 6 + camera.y * b.parY * 2;
-    const cy = b.y + Math.sin(animFrame * 0.003) * 4;
+    const offset = animFrame * b.speed * motionScale - camera.x * b.parX * 6 * parallaxScale + camera.y * b.parY * 2 * parallaxScale;
+    const cy = b.y + (reduceMotion ? 0 : Math.sin(animFrame * 0.003) * 4);
     for (let i = -2; i < 14; i++) {
       const cx = ((i * 180 + offset) % (canvasW + 360)) - 180;
       const cw = 130 + (i % 3) * 40;
