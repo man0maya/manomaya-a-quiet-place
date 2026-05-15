@@ -730,7 +730,7 @@ const getRibbonIcon = (text: string): string => {
       )}
 
       {/* Main world canvas */}
-      <canvas ref={canvasRef} className="block w-full h-full" onClick={handleCanvasTap} onTouchStart={handleCanvasTap}
+      <canvas ref={canvasRef} className={`block w-full h-full ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         style={{ opacity: phase === 'clouds' ? cloudProgress * cloudProgress : 1, imageRendering: 'pixelated' as const, touchAction: 'none' }} />
 
       {/* World UI */}
