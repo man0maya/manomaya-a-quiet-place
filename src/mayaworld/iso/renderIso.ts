@@ -408,11 +408,13 @@ export function renderWorldIso(
   boundSageName: string,
   animFrame: number,
   zoom: number,
+  options?: { reduceMotion?: boolean },
 ) {
+  const reduceMotion = !!options?.reduceMotion;
   ctx.clearRect(0, 0, canvasW, canvasH);
 
   // === Layered ambient backdrop (parallax + time-of-day) ===
-  drawAmbientSky(ctx, world.dayPhase, world.weather, camera, canvasW, canvasH, animFrame);
+  drawAmbientSky(ctx, world.dayPhase, world.weather, camera, canvasW, canvasH, animFrame, reduceMotion);
 
   ctx.save();
   ctx.scale(zoom, zoom);
