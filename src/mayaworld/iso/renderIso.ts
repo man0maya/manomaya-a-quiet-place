@@ -199,7 +199,7 @@ function drawDecor(ctx: CanvasRenderingContext2D, type: string, cx: number, cy: 
 const SAGE_PROPS = ['flame', 'fan', 'lotus', 'staff', 'crystal', 'beads', 'bowl', 'scroll', 'gourd'] as const;
 
 // Iso character — uses generated sprite when loaded, falls back to procedural
-function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: number, animFrame: number, isBound: boolean, sageIndex: number) {
+function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: number, animFrame: number, isBound: boolean, sageIndex: number, reduceMotion = false) {
   const def = SAGE_DEFINITIONS.find(d => d.name === sage.name);
   const robe = def?.robeColor || '#888';
   const accent = sage.color;
@@ -209,8 +209,8 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
   const isResting = sage.state === 'resting';
 
   const walk = Math.floor(animFrame * 0.14 + sageIndex) % 4;
-  const stepBob = isWalking ? (walk % 2 === 0 ? -1 : 0) : 0;
-  const idleBob = !isWalking && !isResting ? Math.sin(animFrame * 0.04 + sageIndex) * 0.7 : 0;
+  const stepBob = !reduceMotion && isWalking ? (walk % 2 === 0 ? -1 : 0) : 0;
+  const idleBob = !reduceMotion && !isWalking && !isResting ? Math.sin(animFrame * 0.04 + sageIndex) * 0.7 : 0;
   const bx = cx;
   const by = cy + stepBob + idleBob - 4; // lift onto top face
   const facingLeft = (sage.targetX - sage.x) < -0.05;
