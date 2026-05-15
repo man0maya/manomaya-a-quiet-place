@@ -764,6 +764,20 @@ const getRibbonIcon = (text: string): string => {
                 {worldSeed != null && (
                   <div className="text-[hsl(var(--foreground))]/55 text-[10px] font-mono tracking-wider">✦ World #{worldSeed}</div>
                 )}
+                <div className="pt-1.5 mt-1 border-t border-[hsl(var(--primary))]/15 flex items-center justify-between gap-2">
+                  <label htmlFor="reduce-motion" className="text-[hsl(var(--foreground))]/85 text-[11px] font-mono cursor-pointer select-none">
+                    Reduce motion
+                  </label>
+                  <button
+                    id="reduce-motion"
+                    onClick={() => setReduceMotion(v => !v)}
+                    role="switch"
+                    aria-checked={reduceMotion}
+                    className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${reduceMotion ? 'bg-[hsl(var(--primary))]' : 'bg-white/20'}`}
+                  >
+                    <span className={`inline-block h-3 w-3 rounded-full bg-white transition-transform ${reduceMotion ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                  </button>
+                </div>
               </div>
             )}
           </div>
