@@ -861,6 +861,10 @@ const getRibbonIcon = (text: string): string => {
             <button onClick={() => setShowMinimap(v => !v)}
               aria-label="Toggle minimap"
               className={`w-10 h-10 flex items-center justify-center text-base bg-black/80 backdrop-blur-md rounded-full border transition-colors ${showMinimap ? 'text-[hsl(var(--primary))] border-[hsl(var(--primary))]' : 'text-[hsl(var(--foreground))]/85 border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))]'}`}>◔</button>
+            <button onClick={recenterCamera}
+              aria-label="Recenter on sage"
+              title="Recenter"
+              className="w-10 h-10 flex items-center justify-center text-base text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))] transition-colors">⌖</button>
             <button onClick={handleModeToggle}
               aria-label={mode === 'observe' ? 'Take authority' : 'Observe'}
               className="w-10 h-10 flex items-center justify-center text-base text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))] transition-colors">
