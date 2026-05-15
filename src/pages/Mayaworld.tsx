@@ -4,7 +4,7 @@ import { SimMode, World, SageAction, Moment, PlayerStats } from "@/mayaworld/typ
 import { createSession, startSession, stopSession, setMode, getNearestSage, getAvailableActions, executeAction, checkMoments, addKarma, pauseSession, resumeSession, getRibbon, Session } from "@/mayaworld/sessionController";
 import { renderWorldIso, renderIsoMinimap, screenToGrid, ISO_TILE_W, ISO_TILE_H, gridToScreen } from "@/mayaworld/renderer";
 import { getNarration, getMoodThought, getInteractionResponse, getActionNarration } from "@/mayaworld/dialogueBank";
-import { loadPrefs, savePrefs } from "@/mayaworld/prefs";
+import { loadPrefs, savePrefs, prefersReducedMotion } from "@/mayaworld/prefs";
 import { preloadSageSprites } from "@/mayaworld/iso/spriteAtlas";
 
 type Phase = 'entry' | 'clouds' | 'world' | 'fading';
@@ -62,14 +62,22 @@ const Mayaworld = () => {
   const initialPrefs = useRef(loadPrefs());
   const zoomRef = useRef(initialPrefs.current.zoom ?? 2);
   const cameraRef = useRef<{ x: number; y: number } | null>(null);
+  const panOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const lastTapRef = useRef<number>(0);
   const [hudExpanded, setHudExpanded] = useState(initialPrefs.current.hudExpanded ?? false);
   const [showMinimap, setShowMinimap] = useState(initialPrefs.current.showMinimap ?? false);
+  const [reduceMotion, setReduceMotion] = useState<boolean>(
+    initialPrefs.current.reduceMotion ?? prefersReducedMotion()
+  );
+  const reduceMotionRef = useRef(reduceMotion);
+  useEffect(() => { reduceMotionRef.current = reduceMotion; }, [reduceMotion]);
   const [savedToast, setSavedToast] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Persist UI prefs
   useEffect(() => { savePrefs({ hudExpanded }); }, [hudExpanded]);
   useEffect(() => { savePrefs({ showMinimap }); }, [showMinimap]);
+  useEffect(() => { savePrefs({ reduceMotion }); }, [reduceMotion]);
 
   // Preload sage sprites once on mount
   useEffect(() => { preloadSageSprites(); }, []);
@@ -296,12 +304,15 @@ const Mayaworld = () => {
       const dx = targetX - cam.x, dy = targetY - cam.y;
       cam.x += Math.abs(dx) < 0.02 ? dx : dx * ease;
       cam.y += Math.abs(dy) < 0.02 ? dy : dy * ease;
-      // Clamp to world bounds
-      cam.x = Math.max(2, Math.min(session.world.width - 2, cam.x));
-      cam.y = Math.max(2, Math.min(session.world.height - 2, cam.y));
+      // Apply user pan offset on top of follow camera
+      const finalX = cam.x + panOffsetRef.current.x;
+      const finalY = cam.y + panOffsetRef.current.y;
+      // Clamp final camera to world bounds
+      const cX = Math.max(2, Math.min(session.world.width - 2, finalX));
+      const cY = Math.max(2, Math.min(session.world.height - 2, finalY));
 
       const totalZoom = dpr * zoomRef.current;
-      renderWorldIso(ctx, session.world, { x: cam.x, y: cam.y }, canvas.width, canvas.height, session.boundSageName, animFrameRef.current, totalZoom);
+      renderWorldIso(ctx, session.world, { x: cX, y: cY }, canvas.width, canvas.height, session.boundSageName, animFrameRef.current, totalZoom, { reduceMotion: reduceMotionRef.current });
       if (showMinimap) renderIsoMinimap(ctx, session.world, session.boundSageName, canvas.width, canvas.height, Math.min(140, canvas.width * 0.25));
       rafRef.current = requestAnimationFrame(draw);
     };
@@ -463,24 +474,22 @@ const Mayaworld = () => {
     setTimeout(() => { if (sessionRef.current) stopSession(sessionRef.current); sessionRef.current = null; }, 1500);
   };
 
-  const handleCanvasTap = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+  const tapToMove = useCallback((clientX: number, clientY: number) => {
     if (mode !== 'authority' || phase !== 'world') return;
     const session = sessionRef.current;
     if (!session) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    let clientX: number, clientY: number;
-    if ('touches' in e) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
-    else { clientX = e.clientX; clientY = e.clientY; }
     const bound = session.world.sages.find(s => s.name === session.boundSageName);
     if (!bound) return;
-    // Convert screen tap → iso grid using same projection used in renderer
     const rect = canvas.getBoundingClientRect();
     const cssW = rect.width, cssH = rect.height;
     const z = zoomRef.current;
     const vw = cssW / z, vh = cssH / z;
-    // Camera-centered iso origin in virtual (post-zoom) space
-    const camIso = gridToScreen(bound.x, bound.y);
+    // Use the same final camera the renderer uses (follow + pan)
+    const camX = (cameraRef.current?.x ?? bound.x) + panOffsetRef.current.x;
+    const camY = (cameraRef.current?.y ?? bound.y) + panOffsetRef.current.y;
+    const camIso = gridToScreen(camX, camY);
     const offX = vw / 2 - camIso.sx;
     const offY = vh / 2 - camIso.sy;
     const localX = (clientX - rect.left) / z - offX;
@@ -493,7 +502,12 @@ const Mayaworld = () => {
     else session.keysDown.add(dy > 0 ? 'ArrowDown' : 'ArrowUp');
     lastTapRef.current = performance.now();
     setTimeout(() => session.keysDown.clear(), 250);
-  };
+  }, [mode, phase]);
+
+  const recenterCamera = useCallback(() => {
+    panOffsetRef.current = { x: 0, y: 0 };
+    lastTapRef.current = performance.now();
+  }, []);
 
   const exportPng = useCallback(() => {
     const canvas = canvasRef.current;
@@ -513,7 +527,7 @@ const Mayaworld = () => {
     }, 'image/png');
   }, []);
 
-  // Wheel + pinch zoom
+  // Wheel + pinch zoom + drag-to-pan (touch & mouse)
   useEffect(() => {
     if (phase !== 'world') return;
     const canvas = canvasRef.current;
@@ -540,17 +554,73 @@ const Mayaworld = () => {
       }
     };
     const onTE = () => { if (pinchStart > 0) savePrefs({ zoom: zoomRef.current }); pinchStart = 0; };
+
+    // === Drag-to-pan via Pointer Events ===
+    const DRAG_THRESHOLD = 6; // px
+    const PAN_LIMIT = 8; // tiles beyond bound sage
+    let pStartX = 0, pStartY = 0, panStartX = 0, panStartY = 0;
+    let pointerDown = false, dragged = false, pointerId = -1;
+
+    const onPointerDown = (e: PointerEvent) => {
+      // Pinch handled separately; ignore secondary touches
+      if (e.pointerType === 'touch' && pinchStart > 0) return;
+      pointerDown = true;
+      dragged = false;
+      pointerId = e.pointerId;
+      pStartX = e.clientX; pStartY = e.clientY;
+      panStartX = panOffsetRef.current.x;
+      panStartY = panOffsetRef.current.y;
+      try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    };
+    const onPointerMove = (e: PointerEvent) => {
+      if (!pointerDown || e.pointerId !== pointerId) return;
+      if (pinchStart > 0) { pointerDown = false; return; }
+      const dxPx = e.clientX - pStartX;
+      const dyPx = e.clientY - pStartY;
+      if (!dragged && Math.hypot(dxPx, dyPx) < DRAG_THRESHOLD) return;
+      if (!dragged) { dragged = true; setIsDragging(true); }
+      // Convert pixel delta → tile delta via inverse iso projection
+      const z = zoomRef.current;
+      const { gx, gy } = screenToGrid(-dxPx / z, -dyPx / z);
+      const nx = panStartX + gx;
+      const ny = panStartY + gy;
+      panOffsetRef.current.x = Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, nx));
+      panOffsetRef.current.y = Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, ny));
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      if (e.pointerId !== pointerId) return;
+      try { canvas.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+      const wasDragged = dragged;
+      pointerDown = false;
+      dragged = false;
+      pointerId = -1;
+      if (wasDragged) { setIsDragging(false); return; }
+      // Treat as tap-to-move
+      tapToMove(e.clientX, e.clientY);
+    };
+    const onPointerCancel = () => {
+      pointerDown = false; dragged = false; pointerId = -1; setIsDragging(false);
+    };
+
     canvas.addEventListener('wheel', onWheel, { passive: false });
     canvas.addEventListener('touchstart', onTS, { passive: true });
     canvas.addEventListener('touchmove', onTM, { passive: false });
     canvas.addEventListener('touchend', onTE);
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointercancel', onPointerCancel);
     return () => {
       canvas.removeEventListener('wheel', onWheel);
       canvas.removeEventListener('touchstart', onTS);
       canvas.removeEventListener('touchmove', onTM);
       canvas.removeEventListener('touchend', onTE);
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('pointercancel', onPointerCancel);
     };
-  }, [phase]);
+  }, [phase, tapToMove]);
 
   const getKarmaLabel = (karma: number): string => {
     if (karma >= KARMA_THRESHOLDS.luminous) return 'Luminous';
@@ -660,7 +730,7 @@ const getRibbonIcon = (text: string): string => {
       )}
 
       {/* Main world canvas */}
-      <canvas ref={canvasRef} className="block w-full h-full" onClick={handleCanvasTap} onTouchStart={handleCanvasTap}
+      <canvas ref={canvasRef} className={`block w-full h-full ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         style={{ opacity: phase === 'clouds' ? cloudProgress * cloudProgress : 1, imageRendering: 'pixelated' as const, touchAction: 'none' }} />
 
       {/* World UI */}
@@ -694,6 +764,20 @@ const getRibbonIcon = (text: string): string => {
                 {worldSeed != null && (
                   <div className="text-[hsl(var(--foreground))]/55 text-[10px] font-mono tracking-wider">✦ World #{worldSeed}</div>
                 )}
+                <div className="pt-1.5 mt-1 border-t border-[hsl(var(--primary))]/15 flex items-center justify-between gap-2">
+                  <label htmlFor="reduce-motion" className="text-[hsl(var(--foreground))]/85 text-[11px] font-mono cursor-pointer select-none">
+                    Reduce motion
+                  </label>
+                  <button
+                    id="reduce-motion"
+                    onClick={() => setReduceMotion(v => !v)}
+                    role="switch"
+                    aria-checked={reduceMotion}
+                    className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${reduceMotion ? 'bg-[hsl(var(--primary))]' : 'bg-white/20'}`}
+                  >
+                    <span className={`inline-block h-3 w-3 rounded-full bg-white transition-transform ${reduceMotion ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -777,6 +861,10 @@ const getRibbonIcon = (text: string): string => {
             <button onClick={() => setShowMinimap(v => !v)}
               aria-label="Toggle minimap"
               className={`w-10 h-10 flex items-center justify-center text-base bg-black/80 backdrop-blur-md rounded-full border transition-colors ${showMinimap ? 'text-[hsl(var(--primary))] border-[hsl(var(--primary))]' : 'text-[hsl(var(--foreground))]/85 border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))]'}`}>◔</button>
+            <button onClick={recenterCamera}
+              aria-label="Recenter on sage"
+              title="Recenter"
+              className="w-10 h-10 flex items-center justify-center text-base text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))] transition-colors">⌖</button>
             <button onClick={handleModeToggle}
               aria-label={mode === 'observe' ? 'Take authority' : 'Observe'}
               className="w-10 h-10 flex items-center justify-center text-base text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))] transition-colors">

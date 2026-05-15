@@ -199,7 +199,7 @@ function drawDecor(ctx: CanvasRenderingContext2D, type: string, cx: number, cy: 
 const SAGE_PROPS = ['flame', 'fan', 'lotus', 'staff', 'crystal', 'beads', 'bowl', 'scroll', 'gourd'] as const;
 
 // Iso character — uses generated sprite when loaded, falls back to procedural
-function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: number, animFrame: number, isBound: boolean, sageIndex: number) {
+function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: number, animFrame: number, isBound: boolean, sageIndex: number, reduceMotion = false) {
   const def = SAGE_DEFINITIONS.find(d => d.name === sage.name);
   const robe = def?.robeColor || '#888';
   const accent = sage.color;
@@ -209,8 +209,8 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
   const isResting = sage.state === 'resting';
 
   const walk = Math.floor(animFrame * 0.14 + sageIndex) % 4;
-  const stepBob = isWalking ? (walk % 2 === 0 ? -1 : 0) : 0;
-  const idleBob = !isWalking && !isResting ? Math.sin(animFrame * 0.04 + sageIndex) * 0.7 : 0;
+  const stepBob = !reduceMotion && isWalking ? (walk % 2 === 0 ? -1 : 0) : 0;
+  const idleBob = !reduceMotion && !isWalking && !isResting ? Math.sin(animFrame * 0.04 + sageIndex) * 0.7 : 0;
   const bx = cx;
   const by = cy + stepBob + idleBob - 4; // lift onto top face
   const facingLeft = (sage.targetX - sage.x) < -0.05;
@@ -234,7 +234,7 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
   }
 
   // Meditation ripple
-  if (isMeditating) {
+  if (isMeditating && !reduceMotion) {
     const ring = (animFrame * 0.5 + sageIndex * 12) % 22 + 8;
     const [rR, gR, bR] = hexToRgb(accent);
     ctx.strokeStyle = `rgba(${rR},${gR},${bR},${Math.max(0, 0.22 - ring * 0.008)})`;
@@ -273,7 +273,7 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
 
   // Bound diamond marker
   if (isBound) {
-    const a = Math.sin(animFrame * 0.06) * 0.3 + 0.7;
+    const a = reduceMotion ? 0.85 : Math.sin(animFrame * 0.06) * 0.3 + 0.7;
     ctx.fillStyle = `rgba(212,175,106,${a})`;
     const my = labelY - 9;
     ctx.beginPath();
@@ -408,11 +408,13 @@ export function renderWorldIso(
   boundSageName: string,
   animFrame: number,
   zoom: number,
+  options?: { reduceMotion?: boolean },
 ) {
+  const reduceMotion = !!options?.reduceMotion;
   ctx.clearRect(0, 0, canvasW, canvasH);
 
   // === Layered ambient backdrop (parallax + time-of-day) ===
-  drawAmbientSky(ctx, world.dayPhase, world.weather, camera, canvasW, canvasH, animFrame);
+  drawAmbientSky(ctx, world.dayPhase, world.weather, camera, canvasW, canvasH, animFrame, reduceMotion);
 
   ctx.save();
   ctx.scale(zoom, zoom);
@@ -488,7 +490,7 @@ export function renderWorldIso(
     const { sx, sy } = gridToScreen(s.x, s.y);
     const cxp = sx + offX, top = sy + offY;
     if (cxp < -40 || cxp > vw + 40 || top < -60 || top > vh + 40) continue;
-    drawIsoSage(ctx, s, cxp, top + ISO_TILE_H / 2, animFrame, s.name === boundSageName, i);
+    drawIsoSage(ctx, s, cxp, top + ISO_TILE_H / 2, animFrame, s.name === boundSageName, i, reduceMotion);
   }
 
   ctx.restore();
@@ -562,6 +564,7 @@ function drawAmbientSky(
   canvasW: number,
   canvasH: number,
   animFrame: number,
+  reduceMotion = false,
 ) {
   const { top, bot } = pickPalette(phase);
   const grad = ctx.createLinearGradient(0, 0, 0, canvasH);
@@ -571,6 +574,8 @@ function drawAmbientSky(
   ctx.fillRect(0, 0, canvasW, canvasH);
 
   // Parallax cloud bands — drift with camera + slow time
+  const motionScale = reduceMotion ? 0.15 : 1;
+  const parallaxScale = reduceMotion ? 0 : 1;
   const bandAlpha = weather === 'mist' ? 0.22 : weather === 'rain' ? 0.14 : 0.10;
   const cloudColor = phase > 0.78 || phase < 0.22 ? '210,220,240' : '255,250,240';
   const bands = [
@@ -579,8 +584,8 @@ function drawAmbientSky(
     { y: canvasH * 0.46, h: canvasH * 0.10, speed: 0.20, parX: 1.0, parY: 0.42, op: bandAlpha * 0.6 },
   ];
   for (const b of bands) {
-    const offset = animFrame * b.speed - camera.x * b.parX * 6 + camera.y * b.parY * 2;
-    const cy = b.y + Math.sin(animFrame * 0.003) * 4;
+    const offset = animFrame * b.speed * motionScale - camera.x * b.parX * 6 * parallaxScale + camera.y * b.parY * 2 * parallaxScale;
+    const cy = b.y + (reduceMotion ? 0 : Math.sin(animFrame * 0.003) * 4);
     for (let i = -2; i < 14; i++) {
       const cx = ((i * 180 + offset) % (canvasW + 360)) - 180;
       const cw = 130 + (i % 3) * 40;
