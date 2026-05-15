@@ -474,24 +474,22 @@ const Mayaworld = () => {
     setTimeout(() => { if (sessionRef.current) stopSession(sessionRef.current); sessionRef.current = null; }, 1500);
   };
 
-  const handleCanvasTap = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+  const tapToMove = useCallback((clientX: number, clientY: number) => {
     if (mode !== 'authority' || phase !== 'world') return;
     const session = sessionRef.current;
     if (!session) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    let clientX: number, clientY: number;
-    if ('touches' in e) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
-    else { clientX = e.clientX; clientY = e.clientY; }
     const bound = session.world.sages.find(s => s.name === session.boundSageName);
     if (!bound) return;
-    // Convert screen tap → iso grid using same projection used in renderer
     const rect = canvas.getBoundingClientRect();
     const cssW = rect.width, cssH = rect.height;
     const z = zoomRef.current;
     const vw = cssW / z, vh = cssH / z;
-    // Camera-centered iso origin in virtual (post-zoom) space
-    const camIso = gridToScreen(bound.x, bound.y);
+    // Use the same final camera the renderer uses (follow + pan)
+    const camX = (cameraRef.current?.x ?? bound.x) + panOffsetRef.current.x;
+    const camY = (cameraRef.current?.y ?? bound.y) + panOffsetRef.current.y;
+    const camIso = gridToScreen(camX, camY);
     const offX = vw / 2 - camIso.sx;
     const offY = vh / 2 - camIso.sy;
     const localX = (clientX - rect.left) / z - offX;
@@ -504,7 +502,12 @@ const Mayaworld = () => {
     else session.keysDown.add(dy > 0 ? 'ArrowDown' : 'ArrowUp');
     lastTapRef.current = performance.now();
     setTimeout(() => session.keysDown.clear(), 250);
-  };
+  }, [mode, phase]);
+
+  const recenterCamera = useCallback(() => {
+    panOffsetRef.current = { x: 0, y: 0 };
+    lastTapRef.current = performance.now();
+  }, []);
 
   const exportPng = useCallback(() => {
     const canvas = canvasRef.current;
