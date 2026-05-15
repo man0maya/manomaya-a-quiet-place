@@ -273,7 +273,7 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
 
   // Bound diamond marker
   if (isBound) {
-    const a = Math.sin(animFrame * 0.06) * 0.3 + 0.7;
+    const a = reduceMotion ? 0.85 : Math.sin(animFrame * 0.06) * 0.3 + 0.7;
     ctx.fillStyle = `rgba(212,175,106,${a})`;
     const my = labelY - 9;
     ctx.beginPath();
