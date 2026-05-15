@@ -490,7 +490,7 @@ export function renderWorldIso(
     const { sx, sy } = gridToScreen(s.x, s.y);
     const cxp = sx + offX, top = sy + offY;
     if (cxp < -40 || cxp > vw + 40 || top < -60 || top > vh + 40) continue;
-    drawIsoSage(ctx, s, cxp, top + ISO_TILE_H / 2, animFrame, s.name === boundSageName, i);
+    drawIsoSage(ctx, s, cxp, top + ISO_TILE_H / 2, animFrame, s.name === boundSageName, i, reduceMotion);
   }
 
   ctx.restore();
