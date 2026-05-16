@@ -137,28 +137,20 @@ export default function Blog() {
   useEffect(() => {
     const fetchOthers = async () => {
       setIsSyncing(true);
+      
+      // Start with static stories so they are always available
+      const items: UnifiedItem[] = staticStories.map(s => ({
+        id: s.id,
+        type: 'static',
+        title: s.title,
+        excerpt: s.excerpt,
+        content: s.content,
+        created_at: s.created_at,
+        read_time: s.readTime
+      }));
+
       try {
-        const [storiesRes, reflectionsRes] = await Promise.all([
-          supabase.from('generated_stories').select('*').limit(20),
-          supabase.from('ai_reflections').select('*').limit(30)
-        ]);
-
-        const items: UnifiedItem[] = [];
-
-        // Add static stories
-        staticStories.forEach(s => {
-          items.push({
-            id: s.id,
-            type: 'static',
-            title: s.title,
-            excerpt: s.excerpt,
-            content: s.content,
-            created_at: s.created_at,
-            read_time: s.readTime
-          });
-        });
-
-        // Add DB posts
+        // Fetch DB posts (already handled by React Query, so we just map them)
         posts.forEach(p => {
           items.push({
             id: p.id,
@@ -172,9 +164,16 @@ export default function Blog() {
           });
         });
 
-        // Add AI Stories
-        if (storiesRes.data) {
-          storiesRes.data.forEach(s => {
+        // Use AllSettled to ensure one failure doesn't block the rest
+        const [storiesRes, reflectionsRes] = await Promise.allSettled([
+          supabase.from('generated_stories').select('*').limit(20),
+          // IMPORTANT: Use RPC for reflections to avoid 403 Forbidden security policy
+          supabase.rpc('get_public_reflections', { _limit: 30 })
+        ]);
+
+        // Process Stories
+        if (storiesRes.status === 'fulfilled' && storiesRes.value.data) {
+          storiesRes.value.data.forEach((s: any) => {
             items.push({
               id: s.id,
               type: 'story',
@@ -187,9 +186,9 @@ export default function Blog() {
           });
         }
 
-        // Add AI Reflections
-        if (reflectionsRes.data) {
-          reflectionsRes.data.forEach(r => {
+        // Process Reflections
+        if (reflectionsRes.status === 'fulfilled' && reflectionsRes.value.data) {
+          reflectionsRes.value.data.forEach((r: any) => {
             items.push({
               id: r.id,
               type: 'reflection',
@@ -211,6 +210,8 @@ export default function Blog() {
         setUnifiedItems(items);
       } catch (err) {
         console.error('Error unifying feed:', err);
+        // If everything fails, at least show what we have (static content)
+        setUnifiedItems(items);
       } finally {
         setIsSyncing(false);
       }
