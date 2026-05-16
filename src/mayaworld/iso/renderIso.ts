@@ -3,6 +3,9 @@ import { TILE_COLORS, SAGE_DEFINITIONS } from '../constants';
 import { ISO_TILE_W, ISO_TILE_H, ISO_ELEV, RAISED, gridToScreen } from './projection';
 import { drawSageSprite, getSageSprite } from './spriteAtlas';
 
+// Dialogue spring pop — tracks when each sage's dialogue last changed
+const _sageDialogueAge = new Map<string, { text: string; frame: number }>();
+
 interface Camera { x: number; y: number; }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -48,6 +51,57 @@ function drawSideWalls(ctx: CanvasRenderingContext2D, cx: number, cy: number, h:
   ctx.lineTo(cx + w / 2, cy + th / 2 + h);
   ctx.closePath();
   ctx.fill();
+}
+
+// Animated water ripple — sine waves + shimmer clipped to diamond shape
+function drawWaterRipple(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  animFrame: number,
+  seed: number,
+  tileType: string,
+) {
+  const isRiver = tileType === 'river';
+  const speed = isRiver ? 1.8 : 0.7;
+  const waveAlpha = isRiver ? 0.20 : 0.13;
+
+  ctx.save();
+  // Clip to the iso diamond
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + ISO_TILE_W / 2, cy + ISO_TILE_H / 2);
+  ctx.lineTo(cx, cy + ISO_TILE_H);
+  ctx.lineTo(cx - ISO_TILE_W / 2, cy + ISO_TILE_H / 2);
+  ctx.closePath();
+  ctx.clip();
+
+  // 3 offset sine waves
+  for (let w = 0; w < 3; w++) {
+    const phase = animFrame * speed * 0.04 + w * 2.1 + seed * 0.31;
+    const yOff  = ISO_TILE_H * 0.22 + w * (ISO_TILE_H * 0.19);
+    ctx.strokeStyle = `rgba(180,225,255,${waveAlpha - w * 0.03})`;
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    for (let px = -ISO_TILE_W / 2; px <= ISO_TILE_W / 2; px += 2) {
+      const wx = cx + px;
+      const wy = cy + yOff + Math.sin(px * 0.22 + phase) * 1.1;
+      if (px === -ISO_TILE_W / 2) ctx.moveTo(wx, wy);
+      else ctx.lineTo(wx, wy);
+    }
+    ctx.stroke();
+  }
+
+  // Drifting shimmer highlight
+  const shimX = cx + Math.sin(animFrame * 0.03 + seed * 1.7) * (ISO_TILE_W * 0.17);
+  const shimY = cy + ISO_TILE_H * 0.42 + Math.cos(animFrame * 0.025 + seed) * (ISO_TILE_H * 0.1);
+  const shimA = 0.06 + Math.sin(animFrame * 0.07 + seed) * 0.04;
+  ctx.fillStyle = `rgba(255,255,255,${shimA})`;
+  ctx.beginPath();
+  ctx.ellipse(shimX, shimY, 4, 1.5, -0.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
 }
 
 // Decoration on top of certain tiles (trees, huts, temples) — kept minimal & crisp
@@ -215,10 +269,14 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
   const by = cy + stepBob + idleBob - 4; // lift onto top face
   const facingLeft = (sage.targetX - sage.x) < -0.05;
 
-  // Contact shadow on the diamond
-  ctx.fillStyle = 'rgba(0,0,0,0.32)';
+  // Soft radial ground shadow
+  const shadowGrad = ctx.createRadialGradient(bx, by + 13, 0, bx, by + 13, 14);
+  shadowGrad.addColorStop(0, 'rgba(0,0,0,0.40)');
+  shadowGrad.addColorStop(0.45, 'rgba(0,0,0,0.20)');
+  shadowGrad.addColorStop(1,  'rgba(0,0,0,0)');
+  ctx.fillStyle = shadowGrad;
   ctx.beginPath();
-  ctx.ellipse(bx, by + 12, 9, 2.6, 0, 0, Math.PI * 2);
+  ctx.ellipse(bx, by + 13, 14, 4.5, 0, 0, Math.PI * 2);
   ctx.fill();
 
   // Aura
@@ -284,8 +342,20 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
     ctx.closePath(); ctx.fill();
   }
 
-// Dialogue bubble — parchment, serif, multi-line word-wrap (up to 3 lines)
+  // Dialogue bubble — parchment, serif, multi-line word-wrap + spring pop
   if (sage.dialogue) {
+    // Track age for spring animation
+    const _prev = _sageDialogueAge.get(sage.name);
+    if (!_prev || _prev.text !== sage.dialogue) {
+      _sageDialogueAge.set(sage.name, { text: sage.dialogue, frame: animFrame });
+    }
+    const _age = animFrame - (_sageDialogueAge.get(sage.name)?.frame ?? animFrame);
+    const _t   = Math.min(1, _age / 22);
+    // Spring: pop in from 0.72 → slight overshoot → settle at 1.0
+    const _springScale = _t < 1
+      ? 0.72 + _t * 0.28 + Math.sin(_t * Math.PI) * 0.07 * (1 - _t)
+      : 1.0;
+
     ctx.font = 'italic 13px "Cormorant Garamond", serif';
     const maxLineW = 172;
     const lineH = 17;
@@ -314,6 +384,13 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
     const px = bx - pw / 2;
     const py = labelY - ph - 10;
 
+    // Apply spring transform around bubble centre
+    const _bubbleCY = py + ph / 2;
+    ctx.save();
+    ctx.translate(bx, _bubbleCY);
+    ctx.scale(_springScale, _springScale);
+    ctx.translate(-bx, -_bubbleCY);
+
     // Drop shadow
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
     roundRect(ctx, px + 1, py + 2, pw, ph, 7); ctx.fill();
@@ -331,12 +408,14 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
     ctx.lineTo(bx, py + ph + 6);
     ctx.lineTo(bx + 4, py + ph);
     ctx.closePath(); ctx.fill();
-    // Text
+    // Text lines
     ctx.fillStyle = '#1C2828';
     ctx.textAlign = 'center';
     for (let i = 0; i < lines.length; i++) {
       ctx.fillText(lines[i], bx, py + padY + i * lineH + 11);
     }
+
+    ctx.restore();
   }
 }
 
@@ -396,6 +475,56 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.lineTo(x, y + r);
   ctx.quadraticCurveTo(x, y, x + r, y);
   ctx.closePath();
+}
+
+// ─── Post-processing pass ────────────────────────────────────────────────────
+// Runs last every frame. Three layers:
+//   1. Color grade  — warm amber/rose/cool tint that shifts with dayPhase
+//   2. Film grain   — 200 random 1px dots at 2.5% opacity each frame
+// (Vignette is handled via CSS overlay in Mayaworld.tsx — GPU-accelerated)
+function drawPostProcess(
+  ctx: CanvasRenderingContext2D,
+  canvasW: number,
+  canvasH: number,
+  dayPhase: number,
+) {
+  // 1. Time-of-day color grade
+  let grR = 255, grG = 220, grB = 140, grA = 0;
+
+  if (dayPhase >= 0.18 && dayPhase <= 0.28) {
+    // Dawn — warm blush orange fades in then out
+    const t = (dayPhase - 0.18) / 0.10;
+    grR = 255; grG = 155 + (t * 55) | 0; grB = 65 + (t * 40) | 0;
+    grA = 0.09 - t * 0.05;
+  } else if (dayPhase > 0.28 && dayPhase <= 0.55) {
+    // Day — subtle warm amber
+    grR = 255; grG = 220; grB = 140;
+    grA = 0.032;
+  } else if (dayPhase > 0.55 && dayPhase <= 0.65) {
+    // Afternoon — very slightly golden
+    grR = 255; grG = 200; grB = 110;
+    grA = 0.04;
+  } else if (dayPhase > 0.65 && dayPhase <= 0.80) {
+    // Dusk — rose amber deepens
+    const t = (dayPhase - 0.65) / 0.15;
+    grR = 235; grG = (105 - t * 30) | 0; grB = (85 - t * 55) | 0;
+    grA = 0.07 + t * 0.06;
+  }
+  // Night: grA stays 0 — night overlay already handles darkness
+
+  if (grA > 0) {
+    ctx.fillStyle = `rgba(${grR},${grG},${grB},${grA})`;
+    ctx.fillRect(0, 0, canvasW, canvasH);
+  }
+
+  // 2. Film grain — 200 random 1px specks
+  for (let i = 0; i < 200; i++) {
+    const gx = (Math.random() * canvasW) | 0;
+    const gy = (Math.random() * canvasH) | 0;
+    const bright = Math.random() > 0.5 ? 255 : 0;
+    ctx.fillStyle = `rgba(${bright},${bright},${bright},0.025)`;
+    ctx.fillRect(gx, gy, 1, 1);
+  }
 }
 
 // === MAIN ===
@@ -461,9 +590,30 @@ export function renderWorldIso(
       ctx.lineTo(cxp - ISO_TILE_W / 2 + 1, top + ISO_TILE_H / 2);
       ctx.closePath();
       ctx.fill();
-      // decorations live above top face
+      // Decorations live above top face
       const seed = (gx * 7 + gy * 13) % 100;
       drawDecor(ctx, tile.type, cxp, top, animFrame, seed);
+
+      // Water tile ripple animation
+      if (tile.type === 'river' || tile.type === 'lake' || tile.type === 'water') {
+        drawWaterRipple(ctx, cxp, top, animFrame, seed, tile.type);
+      }
+
+      // Distance fog — tiles far from camera fade to atmospheric haze
+      const fdx = gx - camera.x;
+      const fdy = gy - camera.y;
+      const fdist = Math.sqrt(fdx * fdx + fdy * fdy);
+      if (fdist > 13) {
+        const fogAlpha = Math.min(0.36, (fdist - 13) / 17 * 0.36);
+        ctx.fillStyle = `rgba(185,208,218,${fogAlpha})`;
+        ctx.beginPath();
+        ctx.moveTo(cxp, top);
+        ctx.lineTo(cxp + ISO_TILE_W / 2, top + ISO_TILE_H / 2);
+        ctx.lineTo(cxp, top + ISO_TILE_H);
+        ctx.lineTo(cxp - ISO_TILE_W / 2, top + ISO_TILE_H / 2);
+        ctx.closePath();
+        ctx.fill();
+      }
     }
   }
 
@@ -515,11 +665,13 @@ export function renderWorldIso(
     }
   }
 
-// Ambient particles (fireflies, pollen, mist wisps)
+  // Ambient particles (fireflies, pollen, mist wisps)
   drawAmbientParticles(ctx, world, canvasW, canvasH, animFrame);
   // Weather
-  drawAmbientParticles(ctx, world, canvasW, canvasH, animFrame);
   drawWeather(ctx, world.weather, canvasW, canvasH, animFrame);
+
+  // Post-processing — color grade + film grain (always last)
+  drawPostProcess(ctx, canvasW, canvasH, world.dayPhase);
 
   ctx.textAlign = 'start';
 }

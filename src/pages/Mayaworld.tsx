@@ -63,6 +63,17 @@ const Mayaworld = () => {
   const zoomRef = useRef(initialPrefs.current.zoom ?? 2);
   const cameraRef = useRef<{ x: number; y: number } | null>(null);
   const panOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Tier 3 — game feel refs
+  const cinematicZoomRef = useRef(1.0);           // current cinematic multiplier
+  const cinematicZoomTargetRef = useRef(1.0);     // target (1.0 = normal, 1.22 = sage encounter)
+  const karmaRipplesRef = useRef<Array<{
+    x: number; y: number; r: number;
+    maxR: number; alpha: number; positive: boolean;
+  }>>([]);
+  const prevKarmaRef = useRef(0);
+  const eventFlashRef = useRef(0);
+  const lastRibbonTsRef = useRef(0);
   const lastTapRef = useRef<number>(0);
   const [hudExpanded, setHudExpanded] = useState(initialPrefs.current.hudExpanded ?? false);
   const [showMinimap, setShowMinimap] = useState(initialPrefs.current.showMinimap ?? false);
@@ -252,16 +263,27 @@ const Mayaworld = () => {
     };
   }, [phase]);
 
-  // Poll the ambient ribbon
+  // Poll the ambient ribbon — also trigger flash on new world events
   useEffect(() => {
     if (phase !== 'world') return;
     const id = setInterval(() => {
       const session = sessionRef.current;
       if (!session) return;
-      setRibbon(getRibbon(session));
+      const newRibbon = getRibbon(session);
+      setRibbon(newRibbon);
+      // Flash when a genuinely new event arrives
+      if (newRibbon.length > 0 && newRibbon[0].ts !== lastRibbonTsRef.current) {
+        eventFlashRef.current = 1.0;
+        lastRibbonTsRef.current = newRibbon[0].ts;
+      }
     }, 1500);
     return () => clearInterval(id);
   }, [phase]);
+
+  // Cinematic zoom — zoom in when near a sage, out when they leave
+  useEffect(() => {
+    cinematicZoomTargetRef.current = nearbySage ? 1.22 : 1.0;
+  }, [nearbySage]);
 
   const syncStats = (session: Session) => {
     setStats({ ...session.stats });
@@ -296,6 +318,7 @@ const Mayaworld = () => {
       const bound = session.world.sages.find(s => s.name === session.boundSageName);
       const targetX = bound ? bound.x : session.world.width / 2;
       const targetY = bound ? bound.y : session.world.height / 2;
+
       // Smooth camera follow
       if (!cameraRef.current) cameraRef.current = { x: targetX, y: targetY };
       const cam = cameraRef.current;
@@ -304,6 +327,9 @@ const Mayaworld = () => {
       const dx = targetX - cam.x, dy = targetY - cam.y;
       cam.x += Math.abs(dx) < 0.02 ? dx : dx * ease;
       cam.y += Math.abs(dy) < 0.02 ? dy : dy * ease;
+      cam.x = Math.max(2, Math.min(session.world.width - 2, cam.x));
+      cam.y = Math.max(2, Math.min(session.world.height - 2, cam.y));
+
       // Apply user pan offset on top of follow camera
       const finalX = cam.x + panOffsetRef.current.x;
       const finalY = cam.y + panOffsetRef.current.y;
@@ -311,9 +337,62 @@ const Mayaworld = () => {
       const cX = Math.max(2, Math.min(session.world.width - 2, finalX));
       const cY = Math.max(2, Math.min(session.world.height - 2, finalY));
 
-      const totalZoom = dpr * zoomRef.current;
+      // Cinematic zoom — smooth lerp toward target
+      cinematicZoomRef.current += (cinematicZoomTargetRef.current - cinematicZoomRef.current) * 0.055;
+
+      const totalZoom = dpr * zoomRef.current * cinematicZoomRef.current;
       renderWorldIso(ctx, session.world, { x: cX, y: cY }, canvas.width, canvas.height, session.boundSageName, animFrameRef.current, totalZoom, { reduceMotion: reduceMotionRef.current });
       if (showMinimap) renderIsoMinimap(ctx, session.world, session.boundSageName, canvas.width, canvas.height, Math.min(140, canvas.width * 0.25));
+
+      // ── Karma ripple rings ──────────────────────────────────────────────
+      const currentKarma = session.stats.karma;
+      if (currentKarma !== prevKarmaRef.current) {
+        const positive = currentKarma > prevKarmaRef.current;
+        karmaRipplesRef.current.push({
+          x: canvas.width / 2,
+          y: canvas.height / 2,
+          r: 0,
+          maxR: Math.min(canvas.width, canvas.height) * 0.32,
+          alpha: 0.65,
+          positive,
+        });
+        // Second ring, slightly delayed feel
+        setTimeout(() => {
+          karmaRipplesRef.current.push({
+            x: canvas.width / 2, y: canvas.height / 2,
+            r: 0, maxR: Math.min(canvas.width, canvas.height) * 0.20,
+            alpha: 0.35, positive,
+          });
+        }, 180);
+        prevKarmaRef.current = currentKarma;
+      }
+      // Draw + decay ripples
+      const alive: typeof karmaRipplesRef.current = [];
+      for (const rp of karmaRipplesRef.current) {
+        rp.r += (rp.maxR - rp.r) * 0.07;
+        rp.alpha *= 0.88;
+        if (rp.alpha > 0.01) {
+          ctx.save();
+          ctx.strokeStyle = rp.positive
+            ? `rgba(212,175,106,${rp.alpha})`
+            : `rgba(220,80,80,${rp.alpha})`;
+          ctx.lineWidth = 2.5 * dpr;
+          ctx.beginPath();
+          ctx.arc(rp.x, rp.y, rp.r, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+          alive.push(rp);
+        }
+      }
+      karmaRipplesRef.current = alive;
+
+      // ── World event flash ───────────────────────────────────────────────
+      if (eventFlashRef.current > 0.005) {
+        ctx.fillStyle = `rgba(255,255,255,${eventFlashRef.current * 0.044})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        eventFlashRef.current *= 0.80;
+      }
+
       rafRef.current = requestAnimationFrame(draw);
     };
     rafRef.current = requestAnimationFrame(draw);
@@ -662,54 +741,114 @@ const getRibbonIcon = (text: string): string => {
   if (phase === 'entry') {
     return (
       <div className="fixed inset-0 bg-[#030608] flex items-center justify-center z-50 overflow-y-auto">
-        <div className="text-center max-w-lg px-8 py-12">
-          {/* Title */}
-          <div className="mb-8">
-            <h1 className="font-mono text-[hsl(var(--primary))]/30 text-lg tracking-[0.4em] uppercase mb-1">
-              MAYAWORLD
+
+        {/* Ambient star field — CSS only, no canvas needed */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {Array.from({ length: 55 }, (_, i) => {
+            const size  = 1 + (i % 3) * 0.6;
+            const left  = `${(i * 37.7 + 11) % 100}%`;
+            const top   = `${(i * 23.3 + 7)  % 100}%`;
+            const delay = `${(i * 0.41) % 6}s`;
+            const dur   = `${3.5 + (i % 4) * 1.2}s`;
+            return (
+              <span key={i} className="absolute rounded-full bg-[hsl(var(--primary))]"
+                style={{ width: size, height: size, left, top,
+                  opacity: 0.08 + (i % 5) * 0.04,
+                  animation: `starPulse ${dur} ${delay} ease-in-out infinite alternate` }} />
+            );
+          })}
+        </div>
+
+        {/* Horizontal rule top */}
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-[hsl(var(--primary))]/15 to-transparent" />
+
+        <div className="relative text-center max-w-lg px-8 py-12 w-full">
+
+          {/* Title block */}
+          <div className="mb-10">
+            <p className="font-mono text-[hsl(var(--primary))]/35 text-[10px] tracking-[0.55em] uppercase mb-5">
+              A Quiet Place
+            </p>
+            <h1 className="font-serif text-[hsl(var(--primary))] text-5xl sm:text-6xl mb-3 leading-none"
+              style={{ textShadow: '0 0 40px rgba(212,175,106,0.25), 0 0 80px rgba(212,175,106,0.10)' }}>
+              Manomaya
             </h1>
-            <div className="w-16 h-px bg-[hsl(var(--primary))]/10 mx-auto" />
+            <div className="flex items-center justify-center gap-3 mt-4">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent to-[hsl(var(--primary))]/20" />
+              <span className="text-[hsl(var(--primary))]/35 text-[11px] font-mono tracking-widest">मनोमय</span>
+              <div className="flex-1 h-px bg-gradient-to-l from-transparent to-[hsl(var(--primary))]/20" />
+            </div>
           </div>
 
-          <div className="mb-10 space-y-2">
+          {/* Poetic lines — fade in sequentially */}
+          <div className="mb-10 space-y-2 min-h-[110px]">
             {POETIC_LINES.map((line, i) => (
-              <p key={i} className="font-serif text-[hsl(var(--foreground))]/35 text-sm leading-relaxed transition-all duration-1000"
-                style={{ opacity: i < visibleLines ? 1 : 0, transform: i < visibleLines ? 'translateY(0)' : 'translateY(8px)' }}>
+              <p key={i}
+                className="font-serif text-[hsl(var(--foreground))]/40 text-sm leading-relaxed transition-all duration-1000 italic"
+                style={{ opacity: i < visibleLines ? 1 : 0, transform: i < visibleLines ? 'translateY(0)' : 'translateY(10px)' }}>
                 {line || '\u00A0'}
               </p>
             ))}
           </div>
 
-          <div className="mb-10 space-y-1" style={{ opacity: visibleLines >= POETIC_LINES.length ? 1 : 0, transition: 'opacity 1.2s ease' }}>
-            <p className="font-mono text-[hsl(var(--primary))]/20 text-[9px] tracking-[0.4em] uppercase mb-3">THE NINE SAGES</p>
-            <div className="grid gap-0.5">
-              {SAGE_DEFINITIONS.map(sage => (
-                <div key={sage.name} className="flex items-center justify-center gap-3 py-0.5 hover:bg-[hsl(var(--primary))]/3 rounded transition-colors cursor-default group">
-                  <span className="font-mono text-[hsl(var(--foreground))]/15 w-10 text-right text-[11px] group-hover:text-[hsl(var(--primary))]/25 transition-colors">
+          {/* Nine sages grid */}
+          <div className="mb-10" style={{ opacity: visibleLines >= POETIC_LINES.length ? 1 : 0, transition: 'opacity 1.2s ease' }}>
+            <p className="font-mono text-[hsl(var(--primary))]/25 text-[9px] tracking-[0.5em] uppercase mb-4">The Nine Sages</p>
+            <div className="grid gap-1">
+              {SAGE_DEFINITIONS.map((sage, i) => (
+                <div key={sage.name}
+                  className="flex items-center justify-center gap-3 py-1 px-3 rounded hover:bg-[hsl(var(--primary))]/5 transition-colors cursor-default group">
+                  <span className="font-mono text-[hsl(var(--foreground))]/20 w-8 text-right text-[10px] group-hover:text-[hsl(var(--primary))]/40 transition-colors">
                     {Object.entries(ACCESS_CODES).find(([, n]) => n === sage.name)?.[0]}
                   </span>
-                  <span className="w-2 h-2 rounded-full ring-1 ring-white/5" style={{ backgroundColor: sage.color, opacity: 0.5 }} />
-                  <span className="font-serif text-[hsl(var(--foreground))]/45 w-20 text-left text-[12px] group-hover:text-[hsl(var(--foreground))]/60 transition-colors">{sage.name}</span>
-                  <span className="text-[hsl(var(--foreground))]/15 italic text-[10px] w-32 text-left">{sage.description}</span>
+                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 transition-all group-hover:scale-125"
+                    style={{ backgroundColor: sage.color, opacity: 0.65, boxShadow: `0 0 6px ${sage.color}55` }} />
+                  <span className="font-serif text-[hsl(var(--foreground))]/60 w-24 text-left text-[13px] group-hover:text-[hsl(var(--foreground))]/85 transition-colors">
+                    {sage.name}
+                  </span>
+                  <span className="text-[hsl(var(--foreground))]/20 italic text-[10px] flex-1 text-left group-hover:text-[hsl(var(--foreground))]/35 transition-colors">
+                    {sage.description}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="flex flex-col items-center gap-4" style={{ opacity: visibleLines >= POETIC_LINES.length ? 1 : 0, transition: 'opacity 1.5s ease 0.5s' }}>
-            <input type="text" inputMode="numeric" maxLength={4} value={code}
-              onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
-              onKeyDown={e => e.key === 'Enter' && handleEnter()}
-              placeholder="· · · ·"
-              className="w-36 text-center text-xl tracking-[0.5em] bg-transparent border-b-2 border-[hsl(var(--primary))]/10 text-[hsl(var(--foreground))]/70 py-3 focus:outline-none focus:border-[hsl(var(--primary))]/30 font-mono placeholder:text-[hsl(var(--foreground))]/8 placeholder:tracking-[0.3em] placeholder:text-lg transition-colors"
-              autoFocus />
-            <button onClick={handleEnter}
-              className="mt-3 px-10 py-3 font-mono text-[10px] tracking-[0.3em] uppercase text-[hsl(var(--primary))]/50 border border-[hsl(var(--primary))]/12 rounded-sm hover:border-[hsl(var(--primary))]/30 hover:text-[hsl(var(--primary))]/80 hover:bg-[hsl(var(--primary))]/5 transition-all duration-500 hover:shadow-[0_0_20px_rgba(212,175,106,0.08)]">
-              ENTER MAYAWORLD
+          {/* Code input + enter */}
+          <div className="flex flex-col items-center gap-5"
+            style={{ opacity: visibleLines >= POETIC_LINES.length ? 1 : 0, transition: 'opacity 1.5s ease 0.5s' }}>
+
+            <div className="relative">
+              <input
+                type="text" inputMode="numeric" maxLength={4} value={code}
+                onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
+                onKeyDown={e => e.key === 'Enter' && handleEnter()}
+                placeholder="· · · ·"
+                className="w-40 text-center text-2xl tracking-[0.6em] bg-transparent border-b border-[hsl(var(--primary))]/20 text-[hsl(var(--foreground))]/80 py-3 focus:outline-none focus:border-[hsl(var(--primary))]/50 font-mono placeholder:text-[hsl(var(--foreground))]/12 placeholder:tracking-[0.4em] placeholder:text-xl transition-all duration-500"
+                autoFocus />
+              <p className="text-[hsl(var(--foreground))]/20 text-[9px] font-mono tracking-widest text-center mt-2 uppercase">
+                enter sage code
+              </p>
+            </div>
+
+            <button
+              onClick={handleEnter}
+              className="group relative px-12 py-3.5 font-mono text-[11px] tracking-[0.35em] uppercase
+                text-[hsl(var(--primary))]/65 border border-[hsl(var(--primary))]/18 rounded-sm
+                hover:border-[hsl(var(--primary))]/50 hover:text-[hsl(var(--primary))]
+                hover:bg-[hsl(var(--primary))]/6 transition-all duration-500
+                hover:shadow-[0_0_30px_rgba(212,175,106,0.12)]">
+              <span className="relative z-10">Enter Mayaworld</span>
             </button>
-            {error && <p className="text-red-400/40 text-xs font-serif italic animate-pulse mt-2">{error}</p>}
+
+            {error && (
+              <p className="text-red-400/50 text-xs font-serif italic animate-pulse">{error}</p>
+            )}
           </div>
         </div>
+
+        {/* Horizontal rule bottom */}
+        <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-[hsl(var(--primary))]/12 to-transparent" />
       </div>
     );
   }
@@ -732,6 +871,14 @@ const getRibbonIcon = (text: string): string => {
       {/* Main world canvas */}
       <canvas ref={canvasRef} className={`block w-full h-full ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         style={{ opacity: phase === 'clouds' ? cloudProgress * cloudProgress : 1, imageRendering: 'pixelated' as const, touchAction: 'none' }} />
+
+      {/* CSS vignette — GPU-accelerated, always on, darkens edges and draws eye to center */}
+      <div
+        className="absolute inset-0 pointer-events-none z-20"
+        style={{
+          background: 'radial-gradient(ellipse 72% 68% at 50% 54%, transparent 0%, rgba(0,0,0,0.18) 60%, rgba(0,0,0,0.62) 100%)',
+        }}
+      />
 
       {/* World UI */}
       {phase === 'world' && (
@@ -783,34 +930,82 @@ const getRibbonIcon = (text: string): string => {
           </div>
 
           {/* Stats overlay */}
-          {showStats && stats && (
-            <div className="absolute top-28 left-3 bg-black/85 backdrop-blur-md border border-[hsl(var(--primary))]/30 rounded px-4 py-3 min-w-[200px] z-20 shadow-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-[hsl(var(--primary))] text-[10px] font-mono tracking-[0.2em] uppercase">STATS</span>
-                <div className="flex-1 h-px bg-[hsl(var(--primary))]/30" />
-              </div>
-              {[
-                ['Level', stats.level],
-                ['XP', `${stats.xp}/${stats.xpToNext}`],
-                ['Karma', `${stats.karma} · ${getKarmaLabel(stats.karma)}`],
-                ['Wisdom', stats.wisdom],
-                ['Insight', stats.insight],
-                ['Bond', stats.bond],
-              ].map(([label, value]) => (
-                <div key={String(label)} className="flex justify-between text-[11px] font-mono text-[hsl(var(--foreground))]/85 py-0.5">
-                  <span>{label}</span>
-                  <span className="text-[hsl(var(--primary))] ml-3">{value}</span>
+          {showStats && stats && (() => {
+            // Karma arc — maps karma (-100..+100) to 0..1
+            const karmaT    = Math.max(0, Math.min(1, (stats.karma + 100) / 200));
+            const xpT       = stats.xpToNext > 0 ? stats.xp / stats.xpToNext : 1;
+            // SVG arc helper
+            const arc = (cx: number, cy: number, r: number, t: number, color: string) => {
+              if (t <= 0) return null;
+              const a0 = -Math.PI * 0.85, a1 = a0 + Math.PI * 1.7 * Math.min(1, t);
+              const x0 = cx + r * Math.cos(a0), y0 = cy + r * Math.sin(a0);
+              const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+              const large = t > 0.5 ? 1 : 0;
+              return <path d={`M${x0},${y0} A${r},${r} 0 ${large} 1 ${x1},${y1}`}
+                stroke={color} strokeWidth="3.5" fill="none" strokeLinecap="round" />;
+            };
+            const karmaLabel = stats.karma > 60 ? 'radiant' : stats.karma > 20 ? 'warm' : stats.karma > -20 ? 'still' : stats.karma > -60 ? 'troubled' : 'dark';
+            const karmaColor = stats.karma >= 0 ? '#D4AF6A' : '#EF8070';
+
+            return (
+              <div className="absolute top-16 left-3 bg-black/88 backdrop-blur-md border border-[hsl(var(--primary))]/22 rounded-xl px-5 py-4 z-20 shadow-2xl w-[210px]"
+                style={{ animation: 'statsIn 0.3s cubic-bezier(0.16,1,0.3,1)' }}>
+
+                {/* Karma arc + label */}
+                <div className="flex flex-col items-center mb-4">
+                  <svg width="100" height="62" viewBox="0 0 100 62">
+                    {/* Track */}
+                    {arc(50, 54, 36, 1, 'rgba(212,175,106,0.10)')}
+                    {/* Fill */}
+                    {arc(50, 54, 36, karmaT, karmaColor)}
+                    {/* Center value */}
+                    <text x="50" y="46" textAnchor="middle"
+                      fill={karmaColor} fontSize="13" fontFamily="serif" fontStyle="italic">
+                      {stats.karma > 0 ? '+' : ''}{stats.karma}
+                    </text>
+                  </svg>
+                  <p className="font-serif italic text-[hsl(var(--foreground))]/50 text-[11px] -mt-1">{karmaLabel}</p>
                 </div>
-              ))}
-              {/* XP bar */}
-              <div className="mt-2 h-1.5 bg-black/60 rounded-full overflow-hidden border border-[hsl(var(--primary))]/30">
-                <div className="h-full bg-[hsl(var(--primary))] rounded-full transition-all duration-500" style={{ width: `${(stats.xp / stats.xpToNext) * 100}%` }} />
+
+                {/* Divider */}
+                <div className="h-px bg-[hsl(var(--primary))]/12 mb-3" />
+
+                {/* XP progress */}
+                <div className="mb-3">
+                  <div className="flex justify-between items-baseline mb-1.5">
+                    <span className="font-serif text-[hsl(var(--foreground))]/45 text-[10px] italic">level {stats.level}</span>
+                    <span className="font-mono text-[hsl(var(--primary))]/60 text-[10px]">{stats.xp} / {stats.xpToNext}</span>
+                  </div>
+                  <div className="h-1 bg-[hsl(var(--primary))]/8 rounded-full overflow-hidden">
+                    <div className="h-full bg-[hsl(var(--primary))]/70 rounded-full transition-all duration-700"
+                      style={{ width: `${xpT * 100}%` }} />
+                  </div>
+                </div>
+
+                {/* Other stats as poetic pairs */}
+                {[
+                  ['wisdom',  stats.wisdom,  '𑁍'],
+                  ['insight', stats.insight, '◈'],
+                  ['bond',    stats.bond,    '♾'],
+                ].map(([label, value, icon]) => (
+                  <div key={String(label)} className="flex items-center gap-2 py-0.5">
+                    <span className="text-[hsl(var(--primary))]/30 text-[10px] w-4">{icon}</span>
+                    <span className="font-serif text-[hsl(var(--foreground))]/45 text-[11px] italic flex-1">{label}</span>
+                    <span className="font-mono text-[hsl(var(--primary))]/70 text-[11px]">{value}</span>
+                  </div>
+                ))}
+
+                {/* Level unlock */}
+                {stats.level > 1 && LEVEL_UNLOCKS[stats.level] && (
+                  <div className="mt-3 pt-2 border-t border-[hsl(var(--primary))]/12">
+                    <p className="font-serif text-[hsl(var(--primary))]/65 text-[10px] italic text-center">
+                      ✦ {LEVEL_UNLOCKS[stats.level]}
+                    </p>
+                  </div>
+                )}
               </div>
-              {stats.level > 1 && LEVEL_UNLOCKS[stats.level] && (
-                <p className="text-[hsl(var(--primary))] text-[10px] font-mono italic mt-2">✦ {LEVEL_UNLOCKS[stats.level]}</p>
-              )}
-            </div>
-          )}
+            );
+          })()}
 
           {/* Inventory */}
           {showInventory && (
@@ -830,20 +1025,63 @@ const getRibbonIcon = (text: string): string => {
             </div>
           )}
 
-          {/* Moments (journal) */}
+          {/* Moments (journal) — manuscript style */}
           {showMoments && (
-            <div className="absolute top-20 right-3 bg-black/85 backdrop-blur-md border border-[hsl(var(--primary))]/30 rounded px-4 py-3 min-w-[220px] max-w-[280px] z-20 shadow-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-[hsl(var(--primary))] text-[10px] font-mono tracking-[0.2em] uppercase">MOMENTS</span>
-                <div className="flex-1 h-px bg-[hsl(var(--primary))]/30" />
-              </div>
-              {moments.map(m => (
-                <div key={m.id} className={`text-[11px] font-mono mb-1.5 ${m.completed ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--foreground))]/85'}`}>
-                  <span>{m.completed ? '✦ ' : '○ '}</span>
-                  <span className={m.completed ? 'line-through' : ''}>{m.title}</span>
-                  <p className="text-[hsl(var(--foreground))]/55 text-[10px] ml-3">{m.description}</p>
+            <div
+              className="absolute top-16 right-3 z-20 shadow-2xl rounded-sm overflow-hidden"
+              style={{
+                minWidth: 240, maxWidth: 300,
+                background: 'linear-gradient(160deg, #F5EDD4 0%, #EDE0BE 60%, #E8D8B0 100%)',
+                animation: 'journalIn 0.3s cubic-bezier(0.16,1,0.3,1)',
+              }}>
+              {/* Top binding strip */}
+              <div className="h-1.5 w-full" style={{ background: 'linear-gradient(90deg, #8B6914, #C49A2A, #8B6914)' }} />
+
+              <div className="px-5 py-4">
+                {/* Header */}
+                <div className="flex items-baseline gap-2 mb-4">
+                  <span className="font-serif text-[#3D2B00] text-[15px] tracking-wide">Journal</span>
+                  <div className="flex-1 border-b border-[#8B6914]/25" />
+                  <span className="font-mono text-[#8B6914]/50 text-[9px] tracking-wider uppercase">moments</span>
                 </div>
-              ))}
+
+                {/* Entries */}
+                <div className="space-y-3">
+                  {moments.map((m, i) => (
+                    <div key={m.id} className="relative pl-4">
+                      {/* Ink bullet */}
+                      <span className="absolute left-0 top-1"
+                        style={{ color: m.completed ? '#8B6914' : '#3D2B0055', fontSize: 10 }}>
+                        {m.completed ? '✦' : '◦'}
+                      </span>
+                      <p className="font-serif text-[#2D1F00] text-[12px] leading-snug"
+                        style={{ textDecoration: m.completed ? 'line-through' : 'none', opacity: m.completed ? 0.6 : 1 }}>
+                        {m.title}
+                      </p>
+                      <p className="font-serif text-[#5C3D00]/65 text-[10px] leading-relaxed italic mt-0.5">
+                        {m.description}
+                      </p>
+                      {/* Ruled line under each entry */}
+                      {i < moments.length - 1 && (
+                        <div className="mt-2.5 border-b border-[#8B6914]/12" />
+                      )}
+                    </div>
+                  ))}
+                  {moments.length === 0 && (
+                    <p className="font-serif text-[#5C3D00]/45 text-[11px] italic text-center py-2">
+                      No moments yet. Walk the world.
+                    </p>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="mt-4 pt-2 border-t border-[#8B6914]/18 flex items-center justify-between">
+                  <span className="font-mono text-[#8B6914]/40 text-[9px] tracking-wider">
+                    {worldSeed != null ? `World #${worldSeed}` : ''}
+                  </span>
+                  <span className="font-serif text-[#8B6914]/35 text-[9px] italic">press J to close</span>
+                </div>
+              </div>
             </div>
           )}
 
