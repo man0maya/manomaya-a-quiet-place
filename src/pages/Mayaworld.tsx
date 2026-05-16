@@ -732,7 +732,7 @@ const Mayaworld = () => {
       canvas.removeEventListener('pointerup', onPointerUp);
       canvas.removeEventListener('pointercancel', onPointerCancel);
     };
-  }, [phase, tapToMove]);
+  }, [phase, tapToMove, recenterCamera]);
 
   const getKarmaLabel = (karma: number): string => {
     if (karma >= KARMA_THRESHOLDS.luminous) return 'Luminous';
@@ -1141,8 +1141,13 @@ const getRibbonIcon = (text: string): string => {
               className="w-10 h-10 flex items-center justify-center text-base text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))] transition-colors">
               {mode === 'observe' ? '✋' : '👁'}
             </button>
+            <button onClick={handleRevisit}
+              aria-label="Revisit a new world"
+              title="New world"
+              className="w-10 h-10 flex items-center justify-center text-base text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))] transition-colors">↻</button>
             <button onClick={handleExit}
-              aria-label="Leave"
+              aria-label="Leave Mayaworld"
+              title="Leave"
               className="w-10 h-10 flex items-center justify-center text-base text-[hsl(var(--foreground))]/85 hover:text-red-400 bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-red-400/60 transition-colors">↩</button>
           </div>
 
