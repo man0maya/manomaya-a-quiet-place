@@ -419,6 +419,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_public_reflections: {
+        Args: { _limit?: number }
+        Returns: {
+          created_at: string
+          explanation: string
+          id: string
+          quote: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -428,6 +437,10 @@ export type Database = {
       }
       increment_visitor_counter: { Args: never; Returns: number }
       is_admin: { Args: never; Returns: boolean }
+      remove_favorite: {
+        Args: { _content_id: string; _session_id: string }
+        Returns: undefined
+      }
       unlike_quote: {
         Args: { _quote_id: string; _session_id: string }
         Returns: undefined
