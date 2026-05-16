@@ -108,34 +108,73 @@ function drawWaterRipple(
 function drawDecor(ctx: CanvasRenderingContext2D, type: string, cx: number, cy: number, animFrame: number, seed: number) {
   switch (type) {
     case 'forest': case 'grove': {
-      // canopy ball
-      const trunkY = cy - 4;
-      ctx.fillStyle = '#4A2810';
-      ctx.fillRect(cx - 1, trunkY, 2, 6);
-      const canopy = type === 'grove' ? '#0D3818' : '#185828';
+      // Varied per-tile: offset, radius, trunk height
+      const ox      = ((seed % 7) - 3) * 1.2;        // x offset -3..+3
+      const oy      = ((seed * 3) % 5) * 0.6;         // y variance
+      const radius  = 5 + (seed % 4);                  // 5–8px canopy
+      const trunkH  = 5 + (seed % 3);                  // 5–7px trunk
+      const trunkX  = cx + ox;
+      const trunkY  = cy - oy;
+      const canopyY = trunkY - trunkH;
+
+      // Trunk
+      ctx.fillStyle = '#5A3A1A';
+      ctx.fillRect(trunkX - 1, canopyY, 2, trunkH + 2);
+
+      // Shadow canopy layer (depth)
+      ctx.fillStyle = type === 'grove' ? '#1A3010' : '#1E3818';
+      ctx.beginPath();
+      ctx.arc(trunkX, canopyY + 1, radius, 0, Math.PI * 2); ctx.fill();
+
+      // Main canopy
+      const canopy = type === 'grove' ? '#2A4A1E' : '#2E4A22';
       ctx.fillStyle = canopy;
-      ctx.beginPath(); ctx.arc(cx, trunkY - 3, 6, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = shade(canopy, 1.3);
-      ctx.beginPath(); ctx.arc(cx - 1.5, trunkY - 4, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath();
+      ctx.arc(trunkX, canopyY - 1, radius - 1, 0, Math.PI * 2); ctx.fill();
+
+      // Highlight lobe
+      ctx.fillStyle = type === 'grove' ? '#3A6028' : '#3A5A28';
+      ctx.beginPath();
+      ctx.arc(trunkX - radius * 0.35, canopyY - radius * 0.35, radius * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Grove — golden lantern glow
       if (type === 'grove') {
         const tw = Math.sin(animFrame * 0.05 + seed) * 0.5 + 0.5;
-        ctx.fillStyle = `rgba(255,220,110,${0.3 + tw * 0.4})`;
-        ctx.fillRect(cx + 2, trunkY - 5, 1, 1);
+        ctx.fillStyle = `rgba(255,210,90,${0.25 + tw * 0.35})`;
+        ctx.beginPath();
+        ctx.arc(trunkX + radius * 0.5, canopyY - radius * 0.3, 1.5, 0, Math.PI * 2);
+        ctx.fill();
       }
       break;
     }
     case 'mountain': {
-      ctx.fillStyle = '#4A5258';
+      // Vary height and width per tile seed
+      const mh = 11 + (seed % 5);
+      const mw = 7  + (seed % 4);
+      const base = cy + ISO_TILE_H / 2;
+      const peak = cy - mh;
+      // Left face (darker)
+      ctx.fillStyle = '#4A4840';
       ctx.beginPath();
-      ctx.moveTo(cx - 8, cy + ISO_TILE_H / 2);
-      ctx.lineTo(cx, cy - 12);
-      ctx.lineTo(cx + 8, cy + ISO_TILE_H / 2);
+      ctx.moveTo(cx, base);
+      ctx.lineTo(cx - mw, base - mh * 0.45);
+      ctx.lineTo(cx, peak);
       ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#E8E8F0';
+      // Right face (medium)
+      ctx.fillStyle = '#5E5A52';
       ctx.beginPath();
-      ctx.moveTo(cx - 2, cy - 7);
-      ctx.lineTo(cx, cy - 12);
-      ctx.lineTo(cx + 2, cy - 7);
+      ctx.moveTo(cx, base);
+      ctx.lineTo(cx + mw, base - mh * 0.38);
+      ctx.lineTo(cx, peak);
+      ctx.closePath(); ctx.fill();
+      // Snow cap
+      const snowH = 3 + (seed % 2);
+      ctx.fillStyle = 'rgba(230,228,235,0.92)';
+      ctx.beginPath();
+      ctx.moveTo(cx - snowH * 0.7, peak + snowH * 1.6);
+      ctx.lineTo(cx, peak);
+      ctx.lineTo(cx + snowH * 0.7, peak + snowH * 1.6);
       ctx.closePath(); ctx.fill();
       break;
     }
@@ -169,22 +208,36 @@ function drawDecor(ctx: CanvasRenderingContext2D, type: string, cx: number, cy: 
       break;
     }
     case 'temple': {
-      ctx.fillStyle = '#D8C8A0';
+      // Sandstone body
+      ctx.fillStyle = '#B8A070';
       ctx.fillRect(cx - 7, cy - 8, 14, 10);
-      ctx.fillStyle = '#C02020';
+      // Shadow on right side of body
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.fillRect(cx + 3, cy - 8, 4, 10);
+      // Stepped roof — terracotta/ochre, not red
+      ctx.fillStyle = '#A07840';
       ctx.beginPath();
       ctx.moveTo(cx - 9, cy - 8);
       ctx.lineTo(cx, cy - 16);
       ctx.lineTo(cx + 9, cy - 8);
       ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#FFD040';
-      ctx.fillRect(cx - 1, cy - 17, 2, 2);
-      const glow = 0.4 + Math.sin(animFrame * 0.04 + seed) * 0.2;
-      ctx.fillStyle = `rgba(255,200,80,${glow})`;
-      ctx.fillRect(cx - 5, cy - 4, 2, 2);
-      ctx.fillRect(cx + 3, cy - 4, 2, 2);
-      ctx.fillStyle = '#4A3020';
-      ctx.fillRect(cx - 1, cy, 2, 2);
+      // Roof shadow side
+      ctx.fillStyle = '#7A5830';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 8);
+      ctx.lineTo(cx, cy - 16);
+      ctx.lineTo(cx + 9, cy - 8);
+      ctx.closePath(); ctx.fill();
+      // Gold spire
+      ctx.fillStyle = '#D4AF40';
+      ctx.fillRect(cx - 1, cy - 18, 2, 3);
+      // Lamp glow
+      const glow = 0.35 + Math.sin(animFrame * 0.04 + seed) * 0.18;
+      ctx.fillStyle = `rgba(255,195,70,${glow})`;
+      ctx.beginPath(); ctx.arc(cx, cy - 2, 4, 0, Math.PI * 2); ctx.fill();
+      // Door
+      ctx.fillStyle = '#3A2510';
+      ctx.fillRect(cx - 1.5, cy - 1, 3, 4);
       break;
     }
     case 'shrine': {
@@ -253,7 +306,7 @@ function drawDecor(ctx: CanvasRenderingContext2D, type: string, cx: number, cy: 
 const SAGE_PROPS = ['flame', 'fan', 'lotus', 'staff', 'crystal', 'beads', 'bowl', 'scroll', 'gourd'] as const;
 
 // Iso character — uses generated sprite when loaded, falls back to procedural
-function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: number, animFrame: number, isBound: boolean, sageIndex: number, reduceMotion = false) {
+function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: number, animFrame: number, isBound: boolean, sageIndex: number, reduceMotion = false, showDialogue = true) {
   const def = SAGE_DEFINITIONS.find(d => d.name === sage.name);
   const robe = def?.robeColor || '#888';
   const accent = sage.color;
@@ -342,8 +395,8 @@ function drawIsoSage(ctx: CanvasRenderingContext2D, sage: Sage, cx: number, cy: 
     ctx.closePath(); ctx.fill();
   }
 
-  // Dialogue bubble — parchment, serif, multi-line word-wrap + spring pop
-  if (sage.dialogue) {
+  // Dialogue bubble — only shown when permitted (limits overlap chaos)
+  if (sage.dialogue && showDialogue) {
     // Track age for spring animation
     const _prev = _sageDialogueAge.get(sage.name);
     if (!_prev || _prev.text !== sage.dialogue) {
@@ -564,6 +617,8 @@ export function renderWorldIso(
   const minY = Math.max(0, cy - halfTilesY);
   const maxY = Math.min(world.height - 1, cy + halfTilesY);
 
+  const isoObjects: Array<any> = [];
+
   // Ground pass (painter order: y+x ascending automatically via nested loops)
   for (let gy = minY; gy <= maxY; gy++) {
     for (let gx = minX; gx <= maxX; gx++) {
@@ -592,14 +647,13 @@ export function renderWorldIso(
       ctx.fill();
       // Decorations live above top face
       const seed = (gx * 7 + gy * 13) % 100;
-      drawDecor(ctx, tile.type, cxp, top, animFrame, seed);
 
-      // Water tile ripple animation
+      // Water tile ripple animation (flat, stays in tile pass)
       if (tile.type === 'river' || tile.type === 'lake' || tile.type === 'water') {
         drawWaterRipple(ctx, cxp, top, animFrame, seed, tile.type);
       }
 
-      // Distance fog — tiles far from camera fade to atmospheric haze
+      // Distance fog
       const fdx = gx - camera.x;
       const fdy = gy - camera.y;
       const fdist = Math.sqrt(fdx * fdx + fdy * fdy);
@@ -614,33 +668,61 @@ export function renderWorldIso(
         ctx.closePath();
         ctx.fill();
       }
+
+      // Collect tall decors for depth-sorted pass
+      if (['forest','grove','mountain','hut','village','temple','shrine','ruins','cave','flower','tall_grass'].includes(tile.type)) {
+        isoObjects.push({ kind: 'decor', gx, gy, cxp, top, tileType: tile.type, seed });
+      }
     }
   }
 
-  // Dropped items
+  // Collect dropped items
   for (const di of world.droppedItems) {
     if (di.x < minX || di.x > maxX || di.y < minY || di.y > maxY) continue;
     const { sx, sy } = gridToScreen(di.x, di.y);
-    const cxp = sx + offX, top = sy + offY + ISO_TILE_H / 2;
-    const bob = Math.sin(animFrame * 0.06 + di.x + di.y) * 1.5;
-    ctx.fillStyle = 'rgba(255,255,200,0.25)';
-    ctx.beginPath(); ctx.arc(cxp, top + bob, 5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#FFD700';
-    ctx.beginPath(); ctx.arc(cxp, top + bob, 2.5, 0, Math.PI * 2); ctx.fill();
+    isoObjects.push({ kind: 'item', gx: di.x, gy: di.y, cxp: sx + offX, top: sy + offY + ISO_TILE_H / 2, item: di });
   }
 
-  // Sages — painter order with bound last
-  const sortedSages = [...world.sages].sort((a, b) => {
-    if (a.name === boundSageName) return 1;
-    if (b.name === boundSageName) return -1;
-    return (a.x + a.y) - (b.x + b.y);
-  });
-  for (let i = 0; i < sortedSages.length; i++) {
-    const s = sortedSages[i];
+  // Collect sages — dialogue limit logic
+  const camX = camera.x, camY = camera.y;
+  let nearestDist = Infinity;
+  let nearestNonBound: string | null = null;
+  for (const s of world.sages) {
+    if (s.name === boundSageName || !s.dialogue) continue;
+    const d = Math.abs(s.x - camX) + Math.abs(s.y - camY);
+    if (d < nearestDist && d < 7) { nearestDist = d; nearestNonBound = s.name; }
+  }
+  for (let i = 0; i < world.sages.length; i++) {
+    const s = world.sages[i];
     const { sx, sy } = gridToScreen(s.x, s.y);
     const cxp = sx + offX, top = sy + offY;
     if (cxp < -40 || cxp > vw + 40 || top < -60 || top > vh + 40) continue;
-    drawIsoSage(ctx, s, cxp, top + ISO_TILE_H / 2, animFrame, s.name === boundSageName, i, reduceMotion);
+    const showDialogue = s.name === boundSageName || s.name === nearestNonBound;
+    isoObjects.push({ kind: 'sage', gx: s.x, gy: s.y, cxp, top, sage: s, isBound: s.name === boundSageName, sageIndex: i, showDialogue });
+  }
+
+  // Sort all objects by isometric depth: ascending (gx + gy), bound sage always last
+  isoObjects.sort((a, b) => {
+    const da = a.gx + a.gy;
+    const db = b.gx + b.gy;
+    if (a.kind === 'sage' && (a as any).isBound) return 1;
+    if (b.kind === 'sage' && (b as any).isBound) return -1;
+    return da - db;
+  });
+
+  // Draw all depth-sorted objects
+  for (const obj of isoObjects) {
+    if (obj.kind === 'decor') {
+      drawDecor(ctx, obj.tileType, obj.cxp, obj.top, animFrame, obj.seed);
+    } else if (obj.kind === 'item') {
+      const bob = Math.sin(animFrame * 0.06 + obj.gx + obj.gy) * 1.5;
+      ctx.fillStyle = 'rgba(255,255,200,0.25)';
+      ctx.beginPath(); ctx.arc(obj.cxp, obj.top + bob, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#FFD700';
+      ctx.beginPath(); ctx.arc(obj.cxp, obj.top + bob, 2.5, 0, Math.PI * 2); ctx.fill();
+    } else if (obj.kind === 'sage') {
+      drawIsoSage(ctx, obj.sage, obj.cxp, obj.top + ISO_TILE_H / 2, animFrame, obj.isBound, obj.sageIndex, reduceMotion, obj.showDialogue);
+    }
   }
 
   ctx.restore();

@@ -38,28 +38,28 @@ export const SAGE_DEFINITIONS: SageDefinition[] = [
 ];
 
 export const TILE_COLORS: Record<string, string> = {
-  water: '#284870',
-  sand: '#E8D8A8',
-  grass: '#48A040',
-  tall_grass: '#388830',
-  forest: '#1A5828',
-  stone: '#787878',
-  stone_path: '#989088',
-  hut: '#8B6B4A',
-  river: '#3878B0',
-  clearing: '#78C060',
-  mountain: '#606868',
-  temple: '#B83030',
-  flower: '#58A848',
-  grove: '#0F4820',
-  beach: '#E8D098',
-  ruins: '#686060',
-  lake: '#285898',
-  bridge: '#8B6840',
-  cave: '#383038',
-  garden: '#60A850',
-  village: '#A89070',
-  shrine: '#C8A050',
+  water:      '#2A4A60',  // deep slate
+  sand:       '#C8B888',  // warm beige
+  grass:      '#5A7A42',  // muted olive green
+  tall_grass: '#4A6A38',  // darker olive
+  forest:     '#304E2A',  // deep muted forest
+  stone:      '#727068',  // warm grey
+  stone_path: '#8A8478',  // lighter warm grey
+  hut:        '#7A5E3A',  // warm brown
+  river:      '#3A6282',  // muted slate blue
+  clearing:   '#6A8E52',  // soft sage green
+  mountain:   '#6A6660',  // warm grey-brown
+  temple:     '#9A7E5A',  // sandstone (not red!)
+  flower:     '#607A48',  // muted green base
+  grove:      '#283E22',  // very deep sage
+  beach:      '#C8B882',  // warm sand
+  ruins:      '#706050',  // warm brown-grey
+  lake:       '#284E78',  // muted deep blue
+  bridge:     '#7A6038',  // warm brown
+  cave:       '#302830',  // very dark
+  garden:     '#588648',  // muted garden green
+  village:    '#907A60',  // warm tan
+  shrine:     '#A88840',  // golden ochre
 };
 
 export const TICKS_PER_SECOND = 5;
