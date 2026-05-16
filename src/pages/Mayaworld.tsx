@@ -553,6 +553,29 @@ const Mayaworld = () => {
     setTimeout(() => { if (sessionRef.current) stopSession(sessionRef.current); sessionRef.current = null; }, 1500);
   };
 
+  const handleRevisit = () => {
+    // Dissolve this world and return to the entry portal for a fresh one
+    if (sessionRef.current) { stopSession(sessionRef.current); sessionRef.current = null; }
+    cameraRef.current = null;
+    panOffsetRef.current = { x: 0, y: 0 };
+    boundNameRef.current = '';
+    setCode('');
+    setError('');
+    setVisibleLines(0);
+    setWorldSeed(null);
+    setStats(null);
+    setMoments([]);
+    setRibbon([]);
+    setNearbySage(null);
+    setShowActionMenu(false);
+    setShowInventory(false);
+    setShowStats(false);
+    setShowMoments(false);
+    setShowModePrompt(false);
+    setObserveTimer(0);
+    setPhase('entry');
+  };
+
   const tapToMove = useCallback((clientX: number, clientY: number) => {
     if (mode !== 'authority' || phase !== 'world') return;
     const session = sessionRef.current;
@@ -666,6 +689,8 @@ const Mayaworld = () => {
       panOffsetRef.current.x = Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, nx));
       panOffsetRef.current.y = Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, ny));
     };
+    const DOUBLE_TAP_MS = 320;
+    let lastUpAt = 0;
     const onPointerUp = (e: PointerEvent) => {
       if (e.pointerId !== pointerId) return;
       try { canvas.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
@@ -674,6 +699,14 @@ const Mayaworld = () => {
       dragged = false;
       pointerId = -1;
       if (wasDragged) { setIsDragging(false); return; }
+      const now = performance.now();
+      if (now - lastUpAt < DOUBLE_TAP_MS) {
+        // Double-tap → recenter on bound sage
+        lastUpAt = 0;
+        recenterCamera();
+        return;
+      }
+      lastUpAt = now;
       // Treat as tap-to-move
       tapToMove(e.clientX, e.clientY);
     };
@@ -699,7 +732,7 @@ const Mayaworld = () => {
       canvas.removeEventListener('pointerup', onPointerUp);
       canvas.removeEventListener('pointercancel', onPointerCancel);
     };
-  }, [phase, tapToMove]);
+  }, [phase, tapToMove, recenterCamera]);
 
   const getKarmaLabel = (karma: number): string => {
     if (karma >= KARMA_THRESHOLDS.luminous) return 'Luminous';
@@ -1108,8 +1141,13 @@ const getRibbonIcon = (text: string): string => {
               className="w-10 h-10 flex items-center justify-center text-base text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))] transition-colors">
               {mode === 'observe' ? '✋' : '👁'}
             </button>
+            <button onClick={handleRevisit}
+              aria-label="Revisit a new world"
+              title="New world"
+              className="w-10 h-10 flex items-center justify-center text-base text-[hsl(var(--foreground))]/85 hover:text-[hsl(var(--primary))] bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-[hsl(var(--primary))] transition-colors">↻</button>
             <button onClick={handleExit}
-              aria-label="Leave"
+              aria-label="Leave Mayaworld"
+              title="Leave"
               className="w-10 h-10 flex items-center justify-center text-base text-[hsl(var(--foreground))]/85 hover:text-red-400 bg-black/80 backdrop-blur-md rounded-full border border-[hsl(var(--primary))]/30 hover:border-red-400/60 transition-colors">↩</button>
           </div>
 
