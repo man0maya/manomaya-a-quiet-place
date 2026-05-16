@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export function useFavorites() {
-  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
 
   const getSessionId = () => {
     let sessionId = localStorage.getItem('manomaya_session');
@@ -13,60 +14,78 @@ export function useFavorites() {
     return sessionId;
   };
 
-  const fetchFavorites = useCallback(async () => {
-    const sessionId = getSessionId();
-    const { data } = await supabase
-      .from('favorites')
-      .select('content_id')
-      .eq('session_id', sessionId);
-    
-    if (data) {
-      setFavorites(new Set(data.map(f => f.content_id)));
-    }
-  }, []);
+  const { data: favoritesSet = new Set<string>() } = useQuery({
+    queryKey: ['favorites'],
+    queryFn: async () => {
+      const sessionId = getSessionId();
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('content_id')
+        .eq('session_id', sessionId);
+      
+      if (error) throw error;
+      return new Set(data.map(f => f.content_id));
+    },
+    // Keep favorites for the session
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 
-  useEffect(() => {
-    fetchFavorites();
-  }, [fetchFavorites]);
+  const toggleMutation = useMutation({
+    mutationFn: async ({ contentId, contentType }: { contentId: string, contentType: 'post' | 'reflection' }) => {
+      const sessionId = getSessionId();
+      const isFavorited = favoritesSet.has(contentId);
 
-  const toggleFavorite = async (contentId: string, contentType: 'post' | 'reflection') => {
-    const sessionId = getSessionId();
-    const isFavorited = favorites.has(contentId);
-
-    // Fix #6: apply optimistic update then roll back on error
-    if (isFavorited) {
-      setFavorites(prev => {
-        const next = new Set(prev);
-        next.delete(contentId);
+      if (isFavorited) {
+        const { error } = await supabase.rpc('remove_favorite', {
+          _content_id: contentId,
+          _session_id: sessionId,
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('favorites')
+          .insert({ content_id: contentId, content_type: contentType, session_id: sessionId });
+        if (error) throw error;
+      }
+    },
+    onMutate: async ({ contentId }) => {
+      // Optimistic update
+      await queryClient.cancelQueries({ queryKey: ['favorites'] });
+      const previousFavorites = queryClient.getQueryData<Set<string>>(['favorites']);
+      
+      queryClient.setQueryData(['favorites'], (old: Set<string> | undefined) => {
+        const next = new Set(old || []);
+        if (next.has(contentId)) {
+          next.delete(contentId);
+        } else {
+          next.add(contentId);
+        }
         return next;
       });
-      const { error } = await supabase.rpc('remove_favorite', {
-        _content_id: contentId,
-        _session_id: sessionId,
-      });
-      if (error) {
-        console.error('Error removing favorite:', error);
-        // Roll back
-        setFavorites(prev => new Set([...prev, contentId]));
+
+      return { previousFavorites };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousFavorites) {
+        queryClient.setQueryData(['favorites'], context.previousFavorites);
       }
-    } else {
-      setFavorites(prev => new Set([...prev, contentId]));
-      const { error } = await supabase
-        .from('favorites')
-        .insert({ content_id: contentId, content_type: contentType, session_id: sessionId });
-      if (error) {
-        console.error('Error adding favorite:', error);
-        // Roll back
-        setFavorites(prev => {
-          const next = new Set(prev);
-          next.delete(contentId);
-          return next;
-        });
-      }
-    }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['favorites'] });
+    },
+  });
+
+  const toggleFavorite = (contentId: string, contentType: 'post' | 'reflection') => {
+    toggleMutation.mutate({ contentId, contentType });
   };
 
-  const isFavorited = (contentId: string) => favorites.has(contentId);
+  const isFavorited = (contentId: string) => favoritesSet.has(contentId);
 
-  return { favorites, toggleFavorite, isFavorited, fetchFavorites };
+  return { 
+    favorites: favoritesSet, 
+    toggleFavorite, 
+    isFavorited, 
+    isLoading: toggleMutation.isPending 
+  };
 }
+

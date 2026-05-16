@@ -1,14 +1,14 @@
-import { useMemo, useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Bookmark, Search, RefreshCw, PenTool, Sparkles, BookOpen, Quote } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import SEOHead from '@/components/SEOHead';
 import { Input } from '@/components/ui/input';
-import { usePublicPosts, Post } from '@/hooks/usePosts';
+import { usePublicPosts } from '@/hooks/usePosts';
 import { useFavorites } from '@/hooks/useFavorites';
-import { supabase } from '@/integrations/supabase/client';
+import { useGeneratedStories, usePublicReflections } from '@/hooks/useGeneratedContent';
 import { staticStories } from '@/lib/static-content';
 import { format } from 'date-fns';
 
@@ -129,98 +129,69 @@ function BlogCard({ item, index }: { item: UnifiedItem; index: number }) {
 
 export default function Blog() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [unifiedItems, setUnifiedItems] = useState<UnifiedItem[]>([]);
-  const [isSyncing, setIsSyncing] = useState(true);
   
-  const { data: posts = [], isLoading: postsLoading, isError: postsError } = usePublicPosts();
+  const { data: posts = [], isLoading: postsLoading } = usePublicPosts();
+  const { data: stories = [], isLoading: storiesLoading } = useGeneratedStories();
+  const { data: reflections = [], isLoading: reflectionsLoading } = usePublicReflections();
 
-  const isLoading = (postsLoading && !postsError) || isSyncing;
+  const unifiedItems = useMemo(() => {
+    // Start with static stories
+    const items: UnifiedItem[] = staticStories.map(s => ({
+      id: s.id,
+      type: 'static',
+      title: s.title,
+      excerpt: s.excerpt,
+      content: s.content,
+      created_at: s.created_at,
+      read_time: s.readTime
+    }));
 
-  useEffect(() => {
-    const fetchOthers = async () => {
-      setIsSyncing(true);
-      
-      // Start with static stories so they are always available
-      const items: UnifiedItem[] = staticStories.map(s => ({
+    // Add DB posts
+    posts.forEach(p => {
+      items.push({
+        id: p.id,
+        type: 'post',
+        title: p.title,
+        excerpt: p.excerpt || stripHtml(p.content).slice(0, 160) + '...',
+        content: p.content,
+        image_url: p.image_url,
+        created_at: p.created_at,
+        published_at: p.published_at
+      });
+    });
+
+    // Add Stories
+    stories.forEach((s: any) => {
+      items.push({
         id: s.id,
-        type: 'static',
+        type: 'story',
         title: s.title,
         excerpt: s.excerpt,
         content: s.content,
         created_at: s.created_at,
-        read_time: s.readTime
-      }));
+        read_time: s.read_time
+      });
+    });
 
-      try {
-        // Fetch DB posts (already handled by React Query, so we just map them)
-        posts.forEach(p => {
-          items.push({
-            id: p.id,
-            type: 'post',
-            title: p.title,
-            excerpt: p.excerpt || stripHtml(p.content).slice(0, 160) + '...',
-            content: p.content,
-            image_url: p.image_url,
-            created_at: p.created_at,
-            published_at: p.published_at
-          });
-        });
+    // Add Reflections
+    reflections.forEach((r: any) => {
+      items.push({
+        id: r.id,
+        type: 'reflection',
+        title: r.quote.length > 40 ? r.quote.slice(0, 40) + '...' : r.quote,
+        excerpt: r.explanation,
+        content: r.explanation,
+        created_at: r.created_at
+      });
+    });
 
-        // Use AllSettled to ensure one failure doesn't block the rest
-        const [storiesRes, reflectionsRes] = await Promise.allSettled([
-          supabase.from('generated_stories').select('*').limit(20),
-          // IMPORTANT: Use RPC for reflections to avoid 403 Forbidden security policy
-          supabase.rpc('get_public_reflections', { _limit: 30 })
-        ]);
-
-        // Process Stories
-        if (storiesRes.status === 'fulfilled' && storiesRes.value.data) {
-          storiesRes.value.data.forEach((s: any) => {
-            items.push({
-              id: s.id,
-              type: 'story',
-              title: s.title,
-              excerpt: s.excerpt,
-              content: s.content,
-              created_at: s.created_at,
-              read_time: s.read_time
-            });
-          });
-        }
-
-        // Process Reflections
-        if (reflectionsRes.status === 'fulfilled' && reflectionsRes.value.data) {
-          reflectionsRes.value.data.forEach((r: any) => {
-            items.push({
-              id: r.id,
-              type: 'reflection',
-              title: r.quote.length > 40 ? r.quote.slice(0, 40) + '...' : r.quote,
-              excerpt: r.explanation,
-              content: r.explanation,
-              created_at: r.created_at
-            });
-          });
-        }
-
-        // Sort: Newest first
-        items.sort((a, b) => {
-          const dateA = new Date(a.published_at || a.created_at).getTime();
-          const dateB = new Date(b.published_at || b.created_at).getTime();
-          return dateB - dateA;
-        });
-
-        setUnifiedItems(items);
-      } catch (err) {
-        console.error('Error unifying feed:', err);
-        // If everything fails, at least show what we have (static content)
-        setUnifiedItems(items);
-      } finally {
-        setIsSyncing(false);
-      }
-    };
-
-    fetchOthers();
-  }, [posts]);
+    // Sort: Newest first
+    return items.sort((a, b) => {
+      const dateA = new Date(a.published_at || a.created_at).getTime();
+      const dateB = new Date(b.published_at || b.created_at).getTime();
+      return dateB - dateA;
+    });
+  }, [posts, stories, reflections]);
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return unifiedItems;
@@ -233,6 +204,7 @@ export default function Blog() {
     );
   }, [unifiedItems, searchQuery]);
 
+  const isLoading = postsLoading || storiesLoading || reflectionsLoading;
 
   return (
     <>
@@ -263,7 +235,7 @@ export default function Blog() {
               className="text-4xl md:text-6xl font-serif text-foreground mb-4"
             >
               Author Blog
-            </motion.h1>
+              </motion.h1>
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -295,7 +267,7 @@ export default function Blog() {
         {/* List */}
         <section className="px-6 pb-24">
           <div className="max-w-2xl mx-auto space-y-8">
-            {isLoading ? (
+            {isLoading && unifiedItems.length === 0 ? (
               <div className="text-center py-16">
                 <RefreshCw className="w-6 h-6 mx-auto text-primary animate-spin" />
                 <p className="text-muted-foreground mt-4">Gathering reflections...</p>
@@ -311,6 +283,11 @@ export default function Blog() {
                 {filtered.map((item, i) => (
                   <BlogCard key={`${item.type}-${item.id}`} item={item} index={i} />
                 ))}
+                {isLoading && (
+                  <div className="text-center py-4">
+                    <RefreshCw className="w-4 h-4 mx-auto text-primary animate-spin" />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -321,3 +298,4 @@ export default function Blog() {
     </>
   );
 }
+
