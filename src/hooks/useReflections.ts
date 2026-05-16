@@ -74,14 +74,17 @@ export function useReflections() {
   const fetchReflections = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('ai_reflections')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
+      const { data, error } = await supabase.rpc('get_public_reflections', { _limit: 50 });
 
       if (error) throw error;
-      setReflections(data || []);
+      // user_input is intentionally not returned by the public function
+      setReflections((data || []).map((r: any) => ({
+        id: r.id,
+        user_input: '',
+        quote: r.quote,
+        explanation: r.explanation,
+        created_at: r.created_at,
+      })));
     } catch (error) {
       console.error('Error fetching reflections:', error);
     } finally {

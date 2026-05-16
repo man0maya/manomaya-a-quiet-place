@@ -1,1 +1,10 @@
 project_id = "vthqbtqsxlcvpdpyprjo"
+
+[functions.generate-reflection]
+verify_jwt = true
+
+[functions.generate-content]
+verify_jwt = true
+
+[functions.generate-daily-reflection]
+verify_jwt = true
