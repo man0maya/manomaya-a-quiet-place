@@ -13,10 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Post } from '@/hooks/usePosts';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useToast } from '@/hooks/use-toast';
-
-function stripHtml(html: string) {
-  return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-}
+import { staticStories } from '@/lib/static-content';
 
 export default function BlogDetail() {
   const { id } = useParams<{ id: string }>();
@@ -36,19 +33,72 @@ export default function BlogDetail() {
         setLoading(false);
         return;
       }
-      const { data, error } = await supabase
+
+      // 1. Check static stories first
+      const staticMatch = staticStories.find(s => s.id === id);
+      if (staticMatch) {
+        if (!cancelled) {
+          setPost({
+            id: staticMatch.id,
+            title: staticMatch.title,
+            content: staticMatch.content,
+            excerpt: staticMatch.excerpt,
+            status: 'published',
+            created_at: staticMatch.created_at,
+            published_at: staticMatch.created_at,
+            image_url: null,
+            display_order: 0,
+            created_by: 'manomaya',
+            updated_at: staticMatch.created_at
+          } as Post);
+          setLoading(false);
+        }
+        return;
+      }
+
+      // 2. Check database posts
+      const { data: dbPost } = await supabase
         .from('posts')
         .select('*')
         .eq('id', id)
         .eq('status', 'published')
         .maybeSingle();
-      if (cancelled) return;
-      if (error || !data) {
-        setNotFound(true);
-      } else {
-        setPost(data as Post);
+
+      if (dbPost && !cancelled) {
+        setPost(dbPost as Post);
+        setLoading(false);
+        return;
       }
-      setLoading(false);
+
+      // 3. Check AI stories
+      const { data: aiStory } = await supabase
+        .from('generated_stories')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (aiStory && !cancelled) {
+        setPost({
+          id: aiStory.id,
+          title: aiStory.title,
+          content: aiStory.content,
+          excerpt: aiStory.excerpt,
+          status: 'published',
+          created_at: aiStory.created_at,
+          published_at: aiStory.created_at,
+          image_url: null,
+          display_order: 0,
+          created_by: 'AI',
+          updated_at: aiStory.created_at
+        } as Post);
+        setLoading(false);
+        return;
+      }
+
+      if (!cancelled) {
+        setNotFound(true);
+        setLoading(false);
+      }
     };
     load();
     return () => {

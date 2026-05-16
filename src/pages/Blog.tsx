@@ -1,31 +1,58 @@
-import { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { useMemo, useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Bookmark, Search, RefreshCw, PenTool } from 'lucide-react';
+import { ArrowRight, Bookmark, Search, RefreshCw, PenTool, Sparkles, BookOpen, Quote } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import SEOHead from '@/components/SEOHead';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { usePublicPosts, Post } from '@/hooks/usePosts';
 import { useFavorites } from '@/hooks/useFavorites';
+import { supabase } from '@/integrations/supabase/client';
+import { staticStories } from '@/lib/static-content';
 import { format } from 'date-fns';
 
 function stripHtml(html: string) {
   return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
 
-function BlogCard({ post, index }: { post: Post; index: number }) {
+type UnifiedItem = {
+  id: string;
+  type: 'post' | 'story' | 'reflection' | 'static';
+  title: string;
+  excerpt: string;
+  content: string;
+  image_url?: string | null;
+  created_at: string;
+  published_at?: string | null;
+  read_time?: string;
+  author?: string;
+};
+
+function BlogCard({ item, index }: { item: UnifiedItem; index: number }) {
   const { isFavorited, toggleFavorite } = useFavorites();
-  const favorited = isFavorited(post.id);
+  const favorited = isFavorited(item.id);
 
-  const excerpt =
-    post.excerpt?.trim() ||
-    stripHtml(post.content).slice(0, 140) + (post.content.length > 140 ? '…' : '');
+  const dateStr = item.published_at
+    ? format(new Date(item.published_at), 'MMM d, yyyy')
+    : format(new Date(item.created_at), 'MMM d, yyyy');
 
-  const dateStr = post.published_at
-    ? format(new Date(post.published_at), 'MMM d, yyyy')
-    : format(new Date(post.created_at), 'MMM d, yyyy');
+  const typeLabel = {
+    post: 'Note',
+    story: 'AI Story',
+    reflection: 'Reflection',
+    static: 'Collection',
+  }[item.type];
+
+  const typeIcon = {
+    post: <PenTool size={10} />,
+    story: <Sparkles size={10} />,
+    reflection: <Quote size={10} />,
+    static: <BookOpen size={10} />,
+  }[item.type];
+
+  // Logic for the detail link
+  const detailLink = item.type === 'reflection' ? null : `/blog/${item.id}`;
 
   return (
     <motion.article
@@ -35,12 +62,12 @@ function BlogCard({ post, index }: { post: Post; index: number }) {
       transition={{ duration: 0.6, delay: Math.min(index * 0.08, 0.4) }}
       className="group relative bg-card/30 hover:bg-card/50 border border-primary/10 hover:border-primary/20 rounded-2xl overflow-hidden transition-all duration-500"
     >
-      <Link to={`/blog/${post.id}`} className="block">
-        {post.image_url && (
+      <div className="block">
+        {item.image_url && (
           <div className="aspect-[16/9] overflow-hidden bg-primary/5">
             <img
-              src={post.image_url}
-              alt={post.title}
+              src={item.image_url}
+              alt={item.title}
               loading="lazy"
               decoding="async"
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
@@ -49,34 +76,47 @@ function BlogCard({ post, index }: { post: Post; index: number }) {
         )}
 
         <div className="p-6 md:p-8">
-          <span className="text-[11px] uppercase tracking-[0.2em] text-primary/60 font-medium">
-            Note
-          </span>
-          <h2 className="font-serif text-2xl md:text-3xl text-foreground mt-3 mb-3 leading-tight group-hover:text-primary transition-colors">
-            {post.title}
-          </h2>
-          {excerpt && (
-            <p className="text-muted-foreground/80 text-sm md:text-base leading-relaxed mb-5 line-clamp-2">
-              {excerpt}
-            </p>
-          )}
-          <div className="flex items-center gap-3 text-xs text-muted-foreground/60">
-            <time dateTime={post.published_at || post.created_at}>{dateStr}</time>
-            <span>·</span>
-            <span className="inline-flex items-center gap-1 text-primary/80 group-hover:text-primary transition-colors">
-              Read more
-              <ArrowRight size={12} className="transition-transform duration-300 group-hover:translate-x-0.5" />
+          <div className="flex items-center gap-2 mb-3">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[10px] uppercase tracking-wider text-primary font-semibold">
+              {typeIcon}
+              {typeLabel}
             </span>
+            {item.read_time && (
+              <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">
+                · {item.read_time}
+              </span>
+            )}
+          </div>
+          
+          <h2 className="font-serif text-2xl md:text-3xl text-foreground mb-3 leading-tight group-hover:text-primary transition-colors">
+            {detailLink ? <Link to={detailLink}>{item.title}</Link> : item.title}
+          </h2>
+          
+          <p className="text-muted-foreground/80 text-sm md:text-base leading-relaxed mb-5 line-clamp-3 italic">
+            {item.excerpt}
+          </p>
+          
+          <div className="flex items-center gap-3 text-xs text-muted-foreground/60">
+            <time dateTime={item.created_at}>{dateStr}</time>
+            {detailLink && (
+              <>
+                <span>·</span>
+                <Link to={detailLink} className="inline-flex items-center gap-1 text-primary/80 group-hover:text-primary transition-colors">
+                  Read more
+                  <ArrowRight size={12} className="transition-transform duration-300 group-hover:translate-x-0.5" />
+                </Link>
+              </>
+            )}
           </div>
         </div>
-      </Link>
+      </div>
 
       <button
         onClick={(e) => {
           e.preventDefault();
-          toggleFavorite(post.id, 'post');
+          toggleFavorite(item.id, item.type === 'reflection' ? 'reflection' : 'post');
         }}
-        aria-label={favorited ? 'Remove bookmark' : 'Bookmark this post'}
+        aria-label={favorited ? 'Remove bookmark' : 'Bookmark this item'}
         className={`absolute top-4 right-4 p-2 rounded-full bg-background/70 backdrop-blur-sm border border-primary/20 transition-colors ${
           favorited ? 'text-primary' : 'text-muted-foreground/60 hover:text-primary'
         }`}
@@ -89,24 +129,114 @@ function BlogCard({ post, index }: { post: Post; index: number }) {
 
 export default function Blog() {
   const [searchQuery, setSearchQuery] = useState('');
-  const { data: posts = [], isLoading } = usePublicPosts();
+  const [unifiedItems, setUnifiedItems] = useState<UnifiedItem[]>([]);
+  const [isSyncing, setIsSyncing] = useState(true);
+  
+  const { data: posts = [], isLoading: postsLoading } = usePublicPosts();
+
+  useEffect(() => {
+    const fetchOthers = async () => {
+      setIsSyncing(true);
+      try {
+        const [storiesRes, reflectionsRes] = await Promise.all([
+          supabase.from('generated_stories').select('*').limit(20),
+          supabase.from('ai_reflections').select('*').limit(30)
+        ]);
+
+        const items: UnifiedItem[] = [];
+
+        // Add static stories
+        staticStories.forEach(s => {
+          items.push({
+            id: s.id,
+            type: 'static',
+            title: s.title,
+            excerpt: s.excerpt,
+            content: s.content,
+            created_at: s.created_at,
+            read_time: s.readTime
+          });
+        });
+
+        // Add DB posts
+        posts.forEach(p => {
+          items.push({
+            id: p.id,
+            type: 'post',
+            title: p.title,
+            excerpt: p.excerpt || stripHtml(p.content).slice(0, 160) + '...',
+            content: p.content,
+            image_url: p.image_url,
+            created_at: p.created_at,
+            published_at: p.published_at
+          });
+        });
+
+        // Add AI Stories
+        if (storiesRes.data) {
+          storiesRes.data.forEach(s => {
+            items.push({
+              id: s.id,
+              type: 'story',
+              title: s.title,
+              excerpt: s.excerpt,
+              content: s.content,
+              created_at: s.created_at,
+              read_time: s.read_time
+            });
+          });
+        }
+
+        // Add AI Reflections
+        if (reflectionsRes.data) {
+          reflectionsRes.data.forEach(r => {
+            items.push({
+              id: r.id,
+              type: 'reflection',
+              title: r.quote.length > 40 ? r.quote.slice(0, 40) + '...' : r.quote,
+              excerpt: r.explanation,
+              content: r.explanation,
+              created_at: r.created_at
+            });
+          });
+        }
+
+        // Sort: Newest first
+        items.sort((a, b) => {
+          const dateA = new Date(a.published_at || a.created_at).getTime();
+          const dateB = new Date(b.published_at || b.created_at).getTime();
+          return dateB - dateA;
+        });
+
+        setUnifiedItems(items);
+      } catch (err) {
+        console.error('Error unifying feed:', err);
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+
+    fetchOthers();
+  }, [posts]);
 
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return posts;
+    if (!searchQuery.trim()) return unifiedItems;
     const q = searchQuery.toLowerCase();
-    return posts.filter(
+    return unifiedItems.filter(
       (p) =>
         p.title.toLowerCase().includes(q) ||
-        stripHtml(p.content).toLowerCase().includes(q) ||
-        (p.excerpt || '').toLowerCase().includes(q)
+        p.excerpt.toLowerCase().includes(q) ||
+        p.content.toLowerCase().includes(q)
     );
-  }, [posts, searchQuery]);
+  }, [unifiedItems, searchQuery]);
+
+  const isLoading = postsLoading || isSyncing;
 
   return (
     <>
       <SEOHead
         title="Blog — Notes & Reflections by manomaya"
-        description="Personal notes and deeply considered thoughts from manomaya. Spiritual reflections, contemplative essays, and quiet writing for the seeking soul."
+        description="A unified feed of spiritual reflections, contemplative essays, and quiet writing. Personal notes and AI-powered wisdom for the seeking soul."
         keywords="manomaya blog, spiritual blog, contemplative writing, mindfulness essays, spiritual reflections, author blog, inner peace"
         canonicalUrl="https://manomaya.lovable.app/blog"
       />
@@ -138,7 +268,7 @@ export default function Blog() {
               transition={{ duration: 0.7, delay: 0.2 }}
               className="text-muted-foreground text-base md:text-lg"
             >
-              Personal notes and deeply considered thoughts
+              Poetic notes, long-form stories, and mindful reflections
             </motion.p>
           </div>
         </section>
@@ -150,7 +280,7 @@ export default function Blog() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="Search posts..."
+                placeholder="Search everything..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 bg-background/40 border-primary/20"
@@ -166,16 +296,20 @@ export default function Blog() {
             {isLoading ? (
               <div className="text-center py-16">
                 <RefreshCw className="w-6 h-6 mx-auto text-primary animate-spin" />
-                <p className="text-muted-foreground mt-4">Loading posts...</p>
+                <p className="text-muted-foreground mt-4">Gathering reflections...</p>
               </div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-16">
                 <p className="text-muted-foreground">
-                  {searchQuery ? 'No posts found.' : 'No posts published yet.'}
+                  {searchQuery ? 'No results found.' : 'No items published yet.'}
                 </p>
               </div>
             ) : (
-              filtered.map((post, i) => <BlogCard key={post.id} post={post} index={i} />)
+              <div className="space-y-10">
+                {filtered.map((item, i) => (
+                  <BlogCard key={`${item.type}-${item.id}`} item={item} index={i} />
+                ))}
+              </div>
             )}
           </div>
         </section>

@@ -11,29 +11,7 @@ import { useAIContent, GeneratedStory } from "@/hooks/useAIContent";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 
-const staticStories = [
-  {
-    id: "the-art-of-stillness",
-    title: "The Art of Stillness",
-    excerpt: "There is a quiet that lives between heartbeats. Not silence — that would be too simple. But a pause, deliberate and knowing, where the mind finally rests.",
-    date: "January 2026",
-    readTime: "5 min read",
-  },
-  {
-    id: "letters-to-the-morning",
-    title: "Letters to the Morning",
-    excerpt: "Each dawn arrives without announcement, expecting nothing in return. Perhaps that is why it feels so holy — this light that asks for nothing but presence.",
-    date: "December 2025",
-    readTime: "4 min read",
-  },
-  {
-    id: "the-weight-of-gentle-things",
-    title: "The Weight of Gentle Things",
-    excerpt: "A leaf falls. A breath releases. A thought dissolves before it fully forms. These weightless moments carry more than we know.",
-    date: "November 2025",
-    readTime: "6 min read",
-  },
-];
+import { staticStories } from "@/lib/static-content";
 
 const Stories = () => {
   const [savedStories, setSavedStories] = useState<GeneratedStory[]>([]);
