@@ -132,7 +132,9 @@ export default function Blog() {
   const [unifiedItems, setUnifiedItems] = useState<UnifiedItem[]>([]);
   const [isSyncing, setIsSyncing] = useState(true);
   
-  const { data: posts = [], isLoading: postsLoading } = usePublicPosts();
+  const { data: posts = [], isLoading: postsLoading, isError: postsError } = usePublicPosts();
+
+  const isLoading = (postsLoading && !postsError) || isSyncing;
 
   useEffect(() => {
     const fetchOthers = async () => {
@@ -231,7 +233,6 @@ export default function Blog() {
     );
   }, [unifiedItems, searchQuery]);
 
-  const isLoading = postsLoading || isSyncing;
 
   return (
     <>
