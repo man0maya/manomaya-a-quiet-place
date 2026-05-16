@@ -40,11 +40,10 @@ export function useFavorites() {
         next.delete(contentId);
         return next;
       });
-      const { error } = await supabase
-        .from('favorites')
-        .delete()
-        .eq('content_id', contentId)
-        .eq('session_id', sessionId);
+      const { error } = await supabase.rpc('remove_favorite', {
+        _content_id: contentId,
+        _session_id: sessionId,
+      });
       if (error) {
         console.error('Error removing favorite:', error);
         // Roll back
