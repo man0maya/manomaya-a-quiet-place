@@ -553,6 +553,29 @@ const Mayaworld = () => {
     setTimeout(() => { if (sessionRef.current) stopSession(sessionRef.current); sessionRef.current = null; }, 1500);
   };
 
+  const handleRevisit = () => {
+    // Dissolve this world and return to the entry portal for a fresh one
+    if (sessionRef.current) { stopSession(sessionRef.current); sessionRef.current = null; }
+    cameraRef.current = null;
+    panOffsetRef.current = { x: 0, y: 0 };
+    boundNameRef.current = '';
+    setCode('');
+    setError('');
+    setVisibleLines(0);
+    setWorldSeed(null);
+    setStats(null);
+    setMoments([]);
+    setRibbon([]);
+    setNearbySage(null);
+    setShowActionMenu(false);
+    setShowInventory(false);
+    setShowStats(false);
+    setShowMoments(false);
+    setShowModePrompt(false);
+    setObserveTimer(0);
+    setPhase('entry');
+  };
+
   const tapToMove = useCallback((clientX: number, clientY: number) => {
     if (mode !== 'authority' || phase !== 'world') return;
     const session = sessionRef.current;
@@ -666,6 +689,8 @@ const Mayaworld = () => {
       panOffsetRef.current.x = Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, nx));
       panOffsetRef.current.y = Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, ny));
     };
+    const DOUBLE_TAP_MS = 320;
+    let lastUpAt = 0;
     const onPointerUp = (e: PointerEvent) => {
       if (e.pointerId !== pointerId) return;
       try { canvas.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
@@ -674,6 +699,14 @@ const Mayaworld = () => {
       dragged = false;
       pointerId = -1;
       if (wasDragged) { setIsDragging(false); return; }
+      const now = performance.now();
+      if (now - lastUpAt < DOUBLE_TAP_MS) {
+        // Double-tap → recenter on bound sage
+        lastUpAt = 0;
+        recenterCamera();
+        return;
+      }
+      lastUpAt = now;
       // Treat as tap-to-move
       tapToMove(e.clientX, e.clientY);
     };
