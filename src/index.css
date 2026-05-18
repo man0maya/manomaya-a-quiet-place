@@ -265,3 +265,23 @@
   from { opacity: 0; transform: translateX(-8px) scale(0.97); }
   to   { opacity: 1; transform: translateX(0) scale(1); }
 }
+
+@keyframes sutraPulse {
+  0%, 100% { box-shadow: none; }
+  50%       { box-shadow: 0 0 12px currentColor; }
+}
+
+@keyframes sutraReveal {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes glyphPulse {
+  0%, 100% { text-shadow: 0 0 40px currentColor; }
+  50%       { text-shadow: 0 0 70px currentColor, 0 0 120px currentColor; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

@@ -161,6 +161,28 @@ export function performAction(sage: Sage, action: SageAction, world: World, near
       }
       return { narrationKey: 'search_empty' };
     }
+    case 'bathe':
+      sage.needs.energy = clamp(sage.needs.energy + 15, 0, 100);
+      return { narrationKey: 'bathe_river' };
+    case 'plant':
+      return { narrationKey: 'plant_earth' };
+    case 'observe_sky':
+      sage.needs.purpose = clamp(sage.needs.purpose - 8, 0, 100);
+      return { narrationKey: 'observe_sky' };
+    case 'read_ruins':
+      return { narrationKey: 'read_ruins' };
+    case 'serve':
+      sage.needs.social = clamp(sage.needs.social - 10, 0, 100);
+      if (nearbySage) nearbySage.relationship = clamp(nearbySage.relationship + 12, 0, 100);
+      return { narrationKey: 'serve_sage' };
+    case 'walk':
+      sage.needs.social = clamp(sage.needs.social - 5, 0, 100);
+      if (nearbySage) nearbySage.relationship = clamp(nearbySage.relationship + 5, 0, 100);
+      return { narrationKey: 'walk_together' };
+    case 'silent':
+      sage.needs.social = clamp(sage.needs.social - 3, 0, 100);
+      if (nearbySage) nearbySage.relationship = clamp(nearbySage.relationship + 8, 0, 100);
+      return { narrationKey: 'silent_presence' };
     default:
       return { narrationKey: 'search_empty' };
   }

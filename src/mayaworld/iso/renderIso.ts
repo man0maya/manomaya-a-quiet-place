@@ -580,6 +580,233 @@ function drawPostProcess(
   }
 }
 
+// ─── Sutra Visual Effects ────────────────────────────────────────────────────
+// Each unlocked sutra adds a layer of world-reading to the renderer.
+// Runs inside ctx.scale(zoom,zoom) block so coordinates are in tile-space.
+function drawSutraEffects(
+  ctx: CanvasRenderingContext2D,
+  world: World,
+  animFrame: number,
+  sutras: Set<string>,
+  visitedTiles: Array<{ x: number; y: number }>,
+  minX: number, maxX: number, minY: number, maxY: number,
+  offX: number, offY: number,
+  vw: number, vh: number,
+  canvasW: number, canvasH: number,
+) {
+  const gs = (gx: number, gy: number) => ({
+    sx: (gx - gy) * (ISO_TILE_W / 2),
+    sy: (gx + gy) * (ISO_TILE_H / 2),
+  });
+
+  // ── Bhrigu: Karma Drishti — tile karma aura ─────────────────────────────
+  if (sutras.has('bhrigu_sutra')) {
+    for (let gy = minY; gy <= maxY; gy++) {
+      for (let gx = minX; gx <= maxX; gx++) {
+        const tile = world.tiles[gy]?.[gx];
+        if (!tile) continue;
+        const { sx, sy } = gs(gx, gy);
+        const cx = sx + offX, cy = sy + offY;
+        if (cx < -40 || cx > vw + 40 || cy < -60 || cy > vh + 40) continue;
+        const pKarma = ((gx * 17 + gy * 31) % 100) - 50;
+        if (Math.abs(pKarma) < 15) continue;
+        const pulse = 0.5 + Math.sin(animFrame * 0.018 + gx * 0.3 + gy * 0.2) * 0.18;
+        ctx.fillStyle = pKarma > 0
+          ? `rgba(212,175,106,${0.11 * pulse})`
+          : `rgba(40,20,60,${0.16 * pulse})`;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + ISO_TILE_W / 2, cy + ISO_TILE_H / 2);
+        ctx.lineTo(cx, cy + ISO_TILE_H);
+        ctx.lineTo(cx - ISO_TILE_W / 2, cy + ISO_TILE_H / 2);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  }
+
+  // ── Pulastya: Sanga Sutra — connection threads between sages ────────────
+  if (sutras.has('pulastya_sutra')) {
+    const visible = world.sages.filter(s => {
+      const { sx, sy } = gs(s.x, s.y);
+      return sx + offX > -40 && sx + offX < vw + 40;
+    });
+    for (let i = 0; i < visible.length; i++) {
+      for (let j = i + 1; j < visible.length; j++) {
+        const a = visible[i], b = visible[j];
+        const dist = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+        if (dist > 12) continue;
+        const { sx: ax, sy: ay } = gs(a.x, a.y);
+        const { sx: bx, sy: by } = gs(b.x, b.y);
+        const asx = ax + offX, asy = ay + offY + ISO_TILE_H / 2;
+        const bsx = bx + offX, bsy = by + offY + ISO_TILE_H / 2;
+        const proximity = 1 - dist / 12;
+        const waver = Math.sin(animFrame * 0.025 + i + j) * 4;
+        ctx.beginPath();
+        ctx.moveTo(asx, asy);
+        ctx.quadraticCurveTo(
+          (asx + bsx) / 2 + waver, (asy + bsy) / 2 - 12,
+          bsx, bsy,
+        );
+        ctx.strokeStyle = `rgba(126,200,160,${0.12 + proximity * 0.22})`;
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+      }
+    }
+  }
+
+  // ── Pulaha: Sukha Nadi — resource sparkles ──────────────────────────────
+  if (sutras.has('pulaha_sutra')) {
+    const resourceTypes = new Set(['river', 'lake', 'flower', 'grove', 'garden']);
+    for (let gy = minY; gy <= maxY; gy++) {
+      for (let gx = minX; gx <= maxX; gx++) {
+        const tile = world.tiles[gy]?.[gx];
+        if (!tile || !resourceTypes.has(tile.type)) continue;
+        const { sx, sy } = gs(gx, gy);
+        const cx = sx + offX, cy = sy + offY + ISO_TILE_H / 2;
+        if (cx < -40 || cx > vw + 40) continue;
+        const seed = (gx * 7 + gy * 13) % 100;
+        for (let k = 0; k < 3; k++) {
+          const blink = Math.sin(animFrame * 0.09 + seed * 0.5 + k * 2.1);
+          if (blink < 0.2) continue;
+          const ox = Math.sin(seed * 1.4 + k * 2.3) * 6;
+          const oy = Math.cos(seed * 0.9 + k * 1.7) * 3 + Math.sin(animFrame * 0.04 + k) * 1.5;
+          ctx.fillStyle = `rgba(180,230,255,${(blink - 0.2) * 0.7})`;
+          ctx.beginPath();
+          ctx.arc(cx + ox, cy + oy, 1.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+  }
+
+  // ── Kratu: Marga Darshana — golden path between sacred sites ───────────
+  if (sutras.has('kratu_sutra')) {
+    const sacred: Array<{ sx: number; sy: number }> = [];
+    for (let gy = minY; gy <= maxY; gy++) {
+      for (let gx = minX; gx <= maxX; gx++) {
+        const tile = world.tiles[gy]?.[gx];
+        if (!tile || (tile.type !== 'temple' && tile.type !== 'shrine')) continue;
+        const { sx, sy } = gs(gx, gy);
+        const cx = sx + offX, cy = sy + offY + ISO_TILE_H / 2;
+        if (cx > -40 && cx < vw + 40) sacred.push({ sx: cx, sy: cy });
+      }
+    }
+    ctx.setLineDash([4, 7]);
+    for (let i = 0; i < sacred.length - 1; i++) {
+      const a = sacred[i], b = sacred[i + 1];
+      const pulse = 0.3 + Math.sin(animFrame * 0.022 + i) * 0.18;
+      ctx.beginPath();
+      ctx.moveTo(a.sx, a.sy);
+      ctx.lineTo(b.sx, b.sy);
+      ctx.strokeStyle = `rgba(212,175,106,${pulse})`;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  // ── Angiras: Jyotir Darshana — sky extra life (drawn full-canvas) ───────
+  if (sutras.has('angiras_sutra')) {
+    if (world.dayPhase > 0.72 || world.dayPhase < 0.28) {
+      for (let i = 0; i < 18; i++) {
+        const seed = i * 137.5;
+        const px = (seed * 2.3 + canvasW * 0.05) % canvasW;
+        const py = (seed * 1.1) % (canvasH * 0.42);
+        const blink = Math.sin(animFrame * 0.07 + i * 1.7);
+        if (blink < 0.1) continue;
+        ctx.fillStyle = `rgba(255,245,210,${blink * 0.18})`;
+        ctx.beginPath();
+        ctx.arc(px, py, 1.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    if (world.dayPhase > 0.13 && world.dayPhase < 0.22) {
+      const t = (world.dayPhase - 0.13) / 0.09;
+      ctx.fillStyle = `rgba(255,175,75,${t * 0.10})`;
+      ctx.fillRect(0, vh * 0.55, canvasW, vh * 0.45);
+    }
+  }
+
+  // ── Marichi: Mana Sutra — visible thoughts above all sages ─────────────
+  if (sutras.has('marichi_sutra')) {
+    ctx.font = 'italic 9px "Cormorant Garamond", serif';
+    ctx.textAlign = 'center';
+    for (const sage of world.sages) {
+      if (!sage.thought) continue;
+      const { sx, sy } = gs(sage.x, sage.y);
+      const cx = sx + offX, cy = sy + offY;
+      if (cx < -60 || cx > vw + 60 || cy < -80 || cy > vh + 40) continue;
+      const drift = Math.sin(animFrame * 0.014 + sage.x * 0.5) * 2.5;
+      const alpha = 0.09 + Math.sin(animFrame * 0.019 + sage.y) * 0.04;
+      const shortT = sage.thought.length > 28 ? sage.thought.slice(0, 28) + '…' : sage.thought;
+      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+      ctx.fillText(shortT, cx, cy - 28 + drift);
+    }
+    ctx.textAlign = 'start';
+  }
+
+  // ── Atri: Arogya Drishti — emotional aura halos ─────────────────────────
+  if (sutras.has('atri_sutra')) {
+    const MOOD_RGB: Record<string, string> = {
+      serene: '160,140,220', content: '160,210,140', restless: '210,100,90',
+      weary: '140,140,140', contemplative: '150,130,210', neutral: '180,180,180',
+    };
+    for (const sage of world.sages) {
+      const { sx, sy } = gs(sage.x, sage.y);
+      const cx = sx + offX, cy = sy + offY + ISO_TILE_H / 2;
+      if (cx < -40 || cx > vw + 40) continue;
+      const rgb = MOOD_RGB[sage.mood] ?? '180,180,180';
+      const pulse = 0.45 + Math.sin(animFrame * 0.022 + sage.x * 0.3) * 0.2;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 20);
+      grad.addColorStop(0, `rgba(${rgb},${0.20 * pulse})`);
+      grad.addColorStop(1, `rgba(${rgb},0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 20, 11, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // ── Vashistha: Smriti Darshana — footprint trail ────────────────────────
+  if (sutras.has('vashistha_sutra') && visitedTiles.length > 1) {
+    for (let vi = 0; vi < visitedTiles.length; vi++) {
+      const vt = visitedTiles[vi];
+      const { sx, sy } = gs(vt.x, vt.y);
+      const cx = sx + offX, cy = sy + offY + ISO_TILE_H / 2;
+      if (cx < -40 || cx > vw + 40) continue;
+      const recency = vi / (visitedTiles.length - 1); // 0=oldest 1=newest
+      ctx.fillStyle = `rgba(212,175,106,${recency * 0.22})`;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // ── Daksha: Shakti Mapa — sacred site energy pulse ──────────────────────
+  if (sutras.has('daksha_sutra')) {
+    const powerTypes = new Set(['temple', 'shrine', 'grove']);
+    for (let gy = minY; gy <= maxY; gy++) {
+      for (let gx = minX; gx <= maxX; gx++) {
+        const tile = world.tiles[gy]?.[gx];
+        if (!tile || !powerTypes.has(tile.type)) continue;
+        const { sx, sy } = gs(gx, gy);
+        const cx = sx + offX, cy = sy + offY + ISO_TILE_H / 2;
+        if (cx < -40 || cx > vw + 40) continue;
+        const pulse = 0.45 + Math.sin(animFrame * 0.035 + gx * 0.5 + gy * 0.4) * 0.35;
+        const pGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 18);
+        pGrad.addColorStop(0, `rgba(212,175,106,${0.28 * pulse})`);
+        pGrad.addColorStop(0.5, `rgba(212,175,106,${0.10 * pulse})`);
+        pGrad.addColorStop(1, `rgba(212,175,106,0)`);
+        ctx.fillStyle = pGrad;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, 18, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+}
+
 // === MAIN ===
 export function renderWorldIso(
   ctx: CanvasRenderingContext2D,
@@ -590,6 +817,8 @@ export function renderWorldIso(
   boundSageName: string,
   animFrame: number,
   zoom: number,
+  unlockedSutras?: Set<string>,
+  visitedTiles?: Array<{ x: number; y: number }>,
   options?: { reduceMotion?: boolean },
 ) {
   const reduceMotion = !!options?.reduceMotion;
@@ -723,6 +952,12 @@ export function renderWorldIso(
     } else if (obj.kind === 'sage') {
       drawIsoSage(ctx, obj.sage, obj.cxp, obj.top + ISO_TILE_H / 2, animFrame, obj.isBound, obj.sageIndex, reduceMotion, obj.showDialogue);
     }
+  }
+
+  // Sutra visual effects — drawn above world, below post-processing
+  if (unlockedSutras && unlockedSutras.size > 0) {
+    drawSutraEffects(ctx, world, animFrame, unlockedSutras, visitedTiles ?? [],
+      minX, maxX, minY, maxY, offX, offY, vw, vh, canvasW, canvasH);
   }
 
   ctx.restore();

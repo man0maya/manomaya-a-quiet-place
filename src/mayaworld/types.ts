@@ -35,7 +35,9 @@ export interface PersonalityWeights {
 export type SageState = 'walking' | 'resting' | 'meditating' | 'observing' | 'conversing' | 'acting';
 export type Mood = 'serene' | 'restless' | 'content' | 'weary' | 'contemplative';
 export type SimMode = 'observe' | 'authority';
-export type SageAction = 'eat' | 'rest' | 'drink' | 'meditate' | 'pray' | 'gift' | 'talk' | 'search' | 'explore' | 'craft_offering' | 'ritual' | 'listen' | 'ask' | 'sit';
+export type SageAction = 'eat' | 'rest' | 'drink' | 'meditate' | 'pray' | 'gift' | 'talk'
+  | 'search' | 'explore' | 'craft_offering' | 'ritual' | 'listen' | 'ask' | 'sit'
+  | 'bathe' | 'plant' | 'observe_sky' | 'read_ruins' | 'serve' | 'walk' | 'silent';
 
 export type Weather = 'clear' | 'rain' | 'mist' | 'wind';
 export type TimeOfDay = 'morning' | 'day' | 'evening' | 'night';

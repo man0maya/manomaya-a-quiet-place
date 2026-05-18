@@ -6,6 +6,8 @@ import { renderWorldIso, renderIsoMinimap, screenToGrid, ISO_TILE_W, ISO_TILE_H,
 import { getNarration, getMoodThought, getInteractionResponse, getActionNarration } from "@/mayaworld/dialogueBank";
 import { loadPrefs, savePrefs, prefersReducedMotion } from "@/mayaworld/prefs";
 import { preloadSageSprites } from "@/mayaworld/iso/spriteAtlas";
+import { SUTRAS, getSutraForSage, isSutraUnlocked, SUTRA_BOND_THRESHOLD, SutraDefinition } from "@/mayaworld/sutraSystem";
+import { getTileContext, ACTION_DISPLAY, getBondLabel, getBondColor } from "@/mayaworld/tileContexts";
 
 type Phase = 'entry' | 'clouds' | 'world' | 'fading';
 
@@ -63,6 +65,11 @@ const Mayaworld = () => {
   const zoomRef = useRef(initialPrefs.current.zoom ?? 2);
   const cameraRef = useRef<{ x: number; y: number } | null>(null);
   const panOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Sutra system
+  const [sutraUnlockModal, setSutraUnlockModal] = useState<SutraDefinition | null>(null);
+  const [unlockedSutraIds, setUnlockedSutraIds] = useState<Set<string>>(new Set());
+  const visitedTilesRef = useRef<Array<{ x: number; y: number }>>([]);
 
   // Tier 3 — game feel refs
   const cinematicZoomRef = useRef(1.0);           // current cinematic multiplier
@@ -341,7 +348,24 @@ const Mayaworld = () => {
       cinematicZoomRef.current += (cinematicZoomTargetRef.current - cinematicZoomRef.current) * 0.055;
 
       const totalZoom = dpr * zoomRef.current * cinematicZoomRef.current;
-      renderWorldIso(ctx, session.world, { x: cX, y: cY }, canvas.width, canvas.height, session.boundSageName, animFrameRef.current, totalZoom, { reduceMotion: reduceMotionRef.current });
+
+      // Track visited tiles for Vashistha's Smriti Darshana sutra
+      if (bound) {
+        const last = visitedTilesRef.current[visitedTilesRef.current.length - 1];
+        if (!last || last.x !== Math.round(bound.x) || last.y !== Math.round(bound.y)) {
+          visitedTilesRef.current.push({ x: Math.round(bound.x), y: Math.round(bound.y) });
+          if (visitedTilesRef.current.length > 100) visitedTilesRef.current.shift();
+        }
+      }
+
+      renderWorldIso(
+        ctx, session.world, { x: cX, y: cY },
+        canvas.width, canvas.height,
+        session.boundSageName, animFrameRef.current, totalZoom,
+        session.unlockedSutras,
+        visitedTilesRef.current,
+        { reduceMotion: reduceMotionRef.current }
+      );
       if (showMinimap) renderIsoMinimap(ctx, session.world, session.boundSageName, canvas.width, canvas.height, Math.min(140, canvas.width * 0.25));
 
       // ── Karma ripple rings ──────────────────────────────────────────────
@@ -431,7 +455,14 @@ const Mayaworld = () => {
       if ((e.key === 'i' || e.key === 'I')) { e.preventDefault(); updateInventory(); setShowInventory(prev => !prev); }
       if ((e.key === 'j' || e.key === 'J')) { e.preventDefault(); setShowMoments(prev => !prev); }
       if ((e.key === 'p' || e.key === 'P')) { e.preventDefault(); syncStats(session); setShowStats(prev => !prev); }
-      if (e.key === 'Escape') { setNearbySage(null); setShowActionMenu(false); setShowInventory(false); setShowStats(false); setShowMoments(false); }
+      if (e.key === 'Escape') {
+        setNearbySage(null);
+        setShowActionMenu(false);
+        setShowInventory(false);
+        setShowStats(false);
+        setShowMoments(false);
+        setSutraUnlockModal(null);
+      }
     };
     const onKeyUp = (e: KeyboardEvent) => { session.keysDown.delete(e.key); };
 
@@ -960,6 +991,24 @@ const getRibbonIcon = (text: string): string => {
                 </div>
               </div>
             )}
+            {/* Active sutras — small glyph row */}
+            {unlockedSutraIds.size > 0 && (
+              <div className="flex gap-1 mt-1.5">
+                {SUTRAS.filter(s => unlockedSutraIds.has(s.id)).map(s => (
+                  <div key={s.id}
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-[11px]"
+                    title={`${s.sanskritName} — ${s.effect}`}
+                    style={{
+                      background: 'rgba(0,0,0,0.75)',
+                      border: `0.5px solid ${s.color}50`,
+                      color: s.color,
+                      boxShadow: `0 0 6px ${s.color}30`,
+                    }}>
+                    {s.glyph}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Stats overlay */}
@@ -1238,56 +1287,197 @@ const getRibbonIcon = (text: string): string => {
             </div>
           )}
 
-          {/* Interaction dialog - RPG style bottom panel */}
-          {nearbySage && (
-            <div className="absolute bottom-0 left-0 right-0 z-20">
-              <div className="bg-black/92 backdrop-blur-md border-t-2 border-[hsl(var(--primary))]/50 px-6 py-5 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
-                <div className="max-w-xl mx-auto">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SAGE_DEFINITIONS.find(s => s.name === nearbySage.name)?.color }} />
-                    <span className="font-mono text-[hsl(var(--primary))] text-[14px] tracking-wider font-semibold">{nearbySage.name}</span>
-                    <span className="text-[hsl(var(--foreground))]/65 text-[11px] font-mono">· {nearbySage.mood}</span>
-                    <span className="text-red-300/80 text-[11px] font-mono ml-auto">♡ {nearbySage.relationship}</span>
-                  </div>
-                  <p className="font-serif text-[hsl(var(--foreground))] text-[15px] leading-relaxed mb-4 pl-4 border-l-2 border-[hsl(var(--primary))]/40">
-                    "{nearbySage.thought}"
-                  </p>
-                  <div className="flex gap-2 flex-wrap">
-                    {['sit', 'listen', 'ask', 'silent'].map(act => (
-                      <button key={act} onClick={() => handleInteraction(act)}
-                        className="text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] text-[12px] font-mono py-2 px-3.5 border border-[hsl(var(--foreground))]/30 rounded hover:border-[hsl(var(--primary))]/60 hover:bg-[hsl(var(--primary))]/10 transition-all">
-                        {act === 'sit' ? '🧘 Sit' : act === 'listen' ? '👂 Listen' : act === 'ask' ? '❓ Ask' : '🤫 Silent'}
-                      </button>
-                    ))}
-                    <button onClick={() => handleAction('gift')}
-                      className="text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] text-[12px] font-mono py-2 px-3.5 border border-[hsl(var(--foreground))]/30 rounded hover:border-[hsl(var(--primary))]/60 hover:bg-[hsl(var(--primary))]/10 transition-all">
-                      🎁 Gift
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Sage interaction panel — sacred encounter */}
+          {nearbySage && (() => {
+            const sageColor = SAGE_DEFINITIONS.find(s => s.name === nearbySage.name)?.color ?? '#D4AF6A';
+            const bondLabel = getBondLabel(nearbySage.relationship);
+            const bondColor = getBondColor(nearbySage.relationship);
+            const bondPct   = Math.max(0, Math.min(100, (nearbySage.relationship + 100) / 2));
+            // Sage-context actions: always available + conditional ones
+            const sageActions: Array<{ id: string; isInteraction: boolean; needsInventory?: boolean }> = [
+              { id: 'sit',    isInteraction: true  },
+              { id: 'listen', isInteraction: true  },
+              { id: 'ask',    isInteraction: true  },
+              { id: 'silent', isInteraction: true  },
+              { id: 'gift',   isInteraction: false, needsInventory: true },
+              { id: 'serve',  isInteraction: false, needsInventory: true },
+              { id: 'walk',   isInteraction: false },
+            ];
+            const session = sessionRef.current;
+            const bound = session?.world.sages.find(s => s.name === session.boundSageName);
+            const hasItems = (bound?.inventory.length ?? 0) > 0;
 
-          {/* Action menu - RPG bottom panel */}
-          {showActionMenu && !nearbySage && (
-            <div className="absolute bottom-0 left-0 right-0 z-20">
-              <div className="bg-black/92 backdrop-blur-md border-t-2 border-[hsl(var(--primary))]/50 px-6 py-4 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
-                <div className="max-w-xl mx-auto">
-                  <p className="text-[hsl(var(--primary))] text-[10px] font-mono tracking-[0.3em] uppercase mb-3">ACTIONS</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {actionMenu.map(a => (
-                      <button key={a.action} onClick={() => handleAction(a.action)}
-                        className="text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] text-[12px] font-mono py-2 px-4 border border-[hsl(var(--foreground))]/30 rounded hover:border-[hsl(var(--primary))]/60 hover:bg-[hsl(var(--primary))]/10 transition-all"
-                        title={a.description}>
-                        {a.label}
-                      </button>
-                    ))}
+            return (
+              <div className="absolute inset-x-0 bottom-0 z-30 px-3 pb-3"
+                style={{ animation: 'sageIn 0.35s cubic-bezier(0.16,1,0.3,1)' }}>
+                <div className="rounded-xl overflow-hidden shadow-2xl max-w-lg mx-auto"
+                  style={{ background: 'rgba(8,10,12,0.97)', border: `0.5px solid ${sageColor}40` }}>
+
+                  {/* Sage header */}
+                  <div className="px-4 pt-4 pb-3" style={{ borderBottom: `0.5px solid ${sageColor}20` }}>
+                    <div className="flex items-center gap-2.5 mb-1">
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: sageColor, boxShadow: `0 0 8px ${sageColor}80` }} />
+                      <span className="font-serif text-white/90 text-[15px]">{nearbySage.name}</span>
+                      <span className="font-mono text-white/35 text-[10px] italic ml-1">{nearbySage.mood}</span>
+                      <div className="flex items-center gap-1.5 ml-auto">
+                        <div className="w-16 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                          <div className="h-full rounded-full transition-all duration-700"
+                            style={{ width: `${bondPct}%`, backgroundColor: bondColor }} />
+                        </div>
+                        <span className="font-mono text-[9px] tracking-wide" style={{ color: bondColor }}>{bondLabel}</span>
+                      </div>
+                    </div>
+                    {/* Sage thought */}
+                    <p className="font-serif text-white/65 text-[12px] leading-relaxed italic pl-3 mt-2"
+                      style={{ borderLeft: `2px solid ${sageColor}50` }}>
+                      "{nearbySage.thought}"
+                    </p>
+                  </div>
+
+                  {/* Action grid */}
+                  <div className="p-3 grid grid-cols-4 gap-2">
+                    {sageActions.map(sa => {
+                      const disp = ACTION_DISPLAY[sa.id];
+                      if (!disp) return null;
+                      const disabled = sa.needsInventory && !hasItems;
+                      return (
+                        <button key={sa.id}
+                          disabled={disabled}
+                          onClick={() => sa.isInteraction ? handleInteraction(sa.id) : handleAction(sa.id as any)}
+                          className="flex flex-col items-center gap-1.5 py-3 px-1 rounded-lg transition-all duration-200"
+                          style={{
+                            background: disabled ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)',
+                            border: `0.5px solid ${disabled ? 'rgba(255,255,255,0.06)' : sageColor + '25'}`,
+                            opacity: disabled ? 0.4 : 1,
+                            cursor: disabled ? 'not-allowed' : 'pointer',
+                          }}
+                          onMouseEnter={e => { if (!disabled) { (e.currentTarget as HTMLElement).style.background = `${sageColor}18`; (e.currentTarget as HTMLElement).style.borderColor = `${sageColor}55`; }}}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = disabled ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)'; (e.currentTarget as HTMLElement).style.borderColor = disabled ? 'rgba(255,255,255,0.06)' : `${sageColor}25`; }}>
+                          <span className="text-lg leading-none">{disp.symbol}</span>
+                          <span className="font-serif text-white/75 text-[10px] text-center leading-tight">{disp.shortLabel}</span>
+                          <span className="font-mono text-[9px]"
+                            style={{ color: disp.karmaPositive ? `${sageColor}` : 'rgba(255,255,255,0.25)' }}>
+                            {disp.karmaText} {disp.karmaPositive ? '⟐' : ''}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {/* Sutra — unlocks at deep bond (relationship >= 80) */}
+                    {(() => {
+                      const sutra = getSutraForSage(nearbySage.name);
+                      const alreadyUnlocked = sutra ? unlockedSutraIds.has(sutra.id) : false;
+                      const canUnlock = nearbySage.relationship >= SUTRA_BOND_THRESHOLD && !alreadyUnlocked;
+                      return (
+                        <button
+                          disabled={!canUnlock && !alreadyUnlocked}
+                          onClick={() => {
+                            if (alreadyUnlocked || !sutra) return;
+                            if (canUnlock) setSutraUnlockModal(sutra);
+                          }}
+                          className="flex flex-col items-center gap-1.5 py-3 px-1 rounded-lg transition-all duration-300"
+                          title={alreadyUnlocked ? `${sutra?.sanskritName} — already received` : canUnlock ? `Receive ${sutra?.sanskritName}` : `Bond must reach deep (${nearbySage.relationship}/80)`}
+                          style={{
+                            background: alreadyUnlocked
+                              ? `${sageColor}22`
+                              : canUnlock
+                                ? `${sageColor}18`
+                                : 'rgba(255,255,255,0.02)',
+                            border: alreadyUnlocked
+                              ? `0.5px solid ${sageColor}60`
+                              : canUnlock
+                                ? `0.5px solid ${sageColor}50`
+                                : '0.5px solid rgba(255,255,255,0.06)',
+                            opacity: canUnlock || alreadyUnlocked ? 1 : 0.28,
+                            cursor: canUnlock ? 'pointer' : 'not-allowed',
+                            animation: canUnlock ? 'sutraPulse 2s ease-in-out infinite' : 'none',
+                          }}>
+                          <span className="text-lg leading-none"
+                            style={{ color: alreadyUnlocked || canUnlock ? sageColor : 'rgba(255,255,255,0.4)' }}>
+                            {alreadyUnlocked ? sutra?.glyph ?? '◯' : canUnlock ? sutra?.glyph ?? '◯' : '◯'}
+                          </span>
+                          <span className="font-serif text-[10px]"
+                            style={{ color: alreadyUnlocked || canUnlock ? `${sageColor}` : 'rgba(255,255,255,0.4)' }}>
+                            {alreadyUnlocked ? 'Received' : 'Sutra'}
+                          </span>
+                          <span className="font-mono text-[9px]"
+                            style={{ color: alreadyUnlocked ? `${sageColor}80` : canUnlock ? `${sageColor}` : 'rgba(255,255,255,0.2)' }}>
+                            {alreadyUnlocked ? sutra?.sanskritName?.split(' ')[0] : canUnlock ? 'receive' : `${nearbySage.relationship}/80`}
+                          </span>
+                        </button>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="px-4 py-2 border-t" style={{ borderColor: `${sageColor}12` }}>
+                    <p className="font-mono text-white/18 text-[9px] tracking-widest text-center uppercase">Esc to step back</p>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
+
+          {/* Tile action panel — contextual sacred actions */}
+          {showActionMenu && !nearbySage && (() => {
+            const session = sessionRef.current;
+            const bound = session?.world.sages.find(s => s.name === session.boundSageName);
+            const tileType = bound ? session?.world.tiles[bound.y]?.[bound.x]?.type ?? 'grass' : 'grass';
+            const ctx = getTileContext(tileType);
+            return (
+              <div className="absolute inset-x-0 bottom-0 z-30 px-3 pb-3"
+                style={{ animation: 'sageIn 0.3s cubic-bezier(0.16,1,0.3,1)' }}>
+                <div className="rounded-xl overflow-hidden shadow-2xl max-w-lg mx-auto"
+                  style={{ background: 'rgba(8,10,12,0.97)', border: '0.5px solid rgba(212,175,106,0.2)' }}>
+
+                  {/* Tile header */}
+                  <div className="px-4 py-3 flex items-center gap-3"
+                    style={{ background: ctx.accentColor, borderBottom: '0.5px solid rgba(212,175,106,0.15)' }}>
+                    <span className="text-2xl flex-shrink-0">{ctx.symbol}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-serif text-white/90 text-[14px] font-medium leading-tight">{ctx.name}</p>
+                      <p className="font-serif text-white/45 text-[11px] italic leading-snug mt-0.5 truncate">"{ctx.aura}"</p>
+                    </div>
+                    <button onClick={() => setShowActionMenu(false)}
+                      className="text-white/30 hover:text-white/60 text-lg flex-shrink-0 w-7 h-7 flex items-center justify-center">×</button>
+                  </div>
+
+                  {/* Action grid */}
+                  <div className="p-3 grid gap-2"
+                    style={{ gridTemplateColumns: `repeat(${Math.min(actionMenu.length, 4)}, 1fr)` }}>
+                    {actionMenu.map(a => {
+                      const disp = ACTION_DISPLAY[a.action] ?? { symbol: '·', shortLabel: a.label, karmaText: '', karmaPositive: true, description: a.description };
+                      return (
+                        <button key={a.action} onClick={() => handleAction(a.action)}
+                          title={disp.description}
+                          className="group flex flex-col items-center gap-1.5 py-3 px-2 rounded-lg transition-all duration-200"
+                          style={{
+                            background: 'rgba(255,255,255,0.04)',
+                            border: '0.5px solid rgba(212,175,106,0.15)',
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(212,175,106,0.10)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(212,175,106,0.40)'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(212,175,106,0.15)'; }}>
+                          <span className="text-xl leading-none">{disp.symbol}</span>
+                          <span className="font-serif text-white/80 text-[11px] text-center leading-tight">{disp.shortLabel}</span>
+                          {disp.karmaText && (
+                            <span className="font-mono text-[10px]"
+                              style={{ color: disp.karmaPositive ? 'rgba(212,175,106,0.8)' : 'rgba(255,255,255,0.3)' }}>
+                              {disp.karmaText} {disp.karmaPositive ? '⟐' : ''}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Footer hint */}
+                  <div className="px-4 py-2 border-t" style={{ borderColor: 'rgba(212,175,106,0.08)' }}>
+                    <p className="font-mono text-white/20 text-[9px] tracking-widest text-center uppercase">Esc to close · E to reopen</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Feedback */}
           {(interactionResponse || actionFeedback) && !nearbySage && !showActionMenu && (
@@ -1346,6 +1536,99 @@ const getRibbonIcon = (text: string): string => {
 <div className="absolute bottom-3 left-3 text-[hsl(var(--foreground))]/75 text-[11px] font-mono tracking-wide bg-black/72 backdrop-blur-sm border border-[hsl(var(--primary))]/18 px-3 py-1.5 rounded-full">
   WASD move · E action · I inv · J journal · P stats
 </div>
+          )}
+
+          {/* Sutra Unlock Modal — sacred initiation screen */}
+          {sutraUnlockModal && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center px-6"
+              style={{
+                background: 'rgba(0,0,0,0.88)',
+                backdropFilter: 'blur(8px)',
+                animation: 'fadeIn 0.5s ease',
+              }}
+              onClick={e => { if (e.target === e.currentTarget) setSutraUnlockModal(null); }}>
+
+              <div className="max-w-sm w-full text-center"
+                style={{ animation: 'sutraReveal 0.7s cubic-bezier(0.16,1,0.3,1)' }}>
+
+                {/* Sage color accent line */}
+                <div className="h-px w-16 mx-auto mb-8"
+                  style={{ background: sutraUnlockModal.color }} />
+
+                {/* Glyph */}
+                <div className="text-6xl mb-6 font-serif"
+                  style={{
+                    color: sutraUnlockModal.color,
+                    textShadow: `0 0 40px ${sutraUnlockModal.color}60, 0 0 80px ${sutraUnlockModal.color}30`,
+                    animation: 'glyphPulse 2.5s ease-in-out infinite',
+                  }}>
+                  {sutraUnlockModal.glyph}
+                </div>
+
+                {/* Names */}
+                <p className="font-mono text-white/30 text-[10px] tracking-[0.5em] uppercase mb-2">
+                  {sutraUnlockModal.sageName} offers
+                </p>
+                <h2 className="font-serif text-[22px] mb-1"
+                  style={{ color: sutraUnlockModal.color }}>
+                  {sutraUnlockModal.sanskritName}
+                </h2>
+                <p className="font-serif text-white/45 text-[13px] italic mb-8">
+                  {sutraUnlockModal.translation}
+                </p>
+
+                {/* Divider */}
+                <div className="h-px mb-6 mx-auto w-24"
+                  style={{ background: `${sutraUnlockModal.color}30` }} />
+
+                {/* Lore */}
+                <p className="font-serif text-white/65 text-[13px] leading-relaxed mb-6 italic">
+                  {sutraUnlockModal.lore}
+                </p>
+
+                {/* Effect */}
+                <div className="rounded-lg px-4 py-3 mb-8"
+                  style={{ background: `${sutraUnlockModal.color}12`, border: `0.5px solid ${sutraUnlockModal.color}30` }}>
+                  <p className="font-mono text-[10px] tracking-wider uppercase mb-1"
+                    style={{ color: `${sutraUnlockModal.color}80` }}>Effect</p>
+                  <p className="font-serif text-white/70 text-[12px] leading-snug">
+                    {sutraUnlockModal.effect}
+                  </p>
+                </div>
+
+                {/* Receive button */}
+                <button
+                  onClick={() => {
+                    const session = sessionRef.current;
+                    if (!session) return;
+                    // Unlock in session and local state
+                    session.unlockedSutras.add(sutraUnlockModal.id);
+                    setUnlockedSutraIds(new Set(session.unlockedSutras));
+                    // Ribbon announcement
+                    session.ribbon.unshift({
+                      text: `${sutraUnlockModal.sageName}'s ${sutraUnlockModal.sanskritName} has entered you.`,
+                      ts: Date.now(),
+                    });
+                    setSutraUnlockModal(null);
+                  }}
+                  className="font-mono text-[11px] tracking-[0.3em] uppercase px-10 py-3.5 rounded-sm transition-all duration-500"
+                  style={{
+                    color: sutraUnlockModal.color,
+                    border: `0.5px solid ${sutraUnlockModal.color}50`,
+                    background: `${sutraUnlockModal.color}08`,
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${sutraUnlockModal!.color}18`; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = `${sutraUnlockModal!.color}08`; }}>
+                  Receive this Sutra
+                </button>
+
+                <p className="font-mono text-white/18 text-[9px] mt-4 tracking-widest">Esc to decline</p>
+
+                <div className="h-px w-16 mx-auto mt-8"
+                  style={{ background: sutraUnlockModal.color }} />
+              </div>
+            </div>
           )}
         </>
       )}

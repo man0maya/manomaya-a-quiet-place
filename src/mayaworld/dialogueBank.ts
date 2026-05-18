@@ -287,6 +287,27 @@ const actionNarrations: Record<string, string[]> = {
     "Sitting together, the world simplifies.",
     "No words needed. Presence is enough.",
   ],
+  bathe_river: [
+    "You step into the current. The water carries everything away."
+  ],
+  plant_earth: [
+    "You press a seed into the soil. The earth receives it without question."
+  ],
+  observe_sky: [
+    "You lift your eyes. The sky holds everything without holding anything."
+  ],
+  read_ruins: [
+    "You trace the carved lines with your fingers. Some knowledge is older than words."
+  ],
+  serve_sage: [
+    "You put your hands to work. The sage notices without turning."
+  ],
+  walk_together: [
+    "You fall into step beside them. No words are needed for this."
+  ],
+  silent_presence: [
+    "You offer your silence. It is received as a gift."
+  ],
 };
 
 export function getActionNarration(action: string): string {

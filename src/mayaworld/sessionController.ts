@@ -24,6 +24,7 @@ export interface Session {
   ribbon: { text: string; ts: number }[];
   nextEventTick: number;
   activeEvent: { kind: string; x: number; y: number; ttl: number } | null;
+  unlockedSutras: Set<string>;
 }
 
 export function createSession(boundSageName: string): Session {
@@ -39,6 +40,7 @@ export function createSession(boundSageName: string): Session {
     ribbon: [],
     nextEventTick: 300 + Math.floor(Math.random() * 300),
     activeEvent: null,
+    unlockedSutras: new Set(),
   };
 }
 
